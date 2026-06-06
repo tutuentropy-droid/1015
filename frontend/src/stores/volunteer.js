@@ -26,6 +26,9 @@ export const useVolunteerStore = defineStore('volunteer', {
     predictions: [],
     volunteerPlan: null,
 
+    compareList: [],
+    maxCompare: 5,
+
     loading: {
       meta: false,
       colleges: false,
@@ -40,6 +43,8 @@ export const useVolunteerStore = defineStore('volunteer', {
     reachColleges: (state) => state.predictions.filter((p) => p.category === '冲'),
     stableColleges: (state) => state.predictions.filter((p) => p.category === '稳'),
     safeColleges: (state) => state.predictions.filter((p) => p.category === '保'),
+    isInCompare: (state) => (id) => state.compareList.some((c) => c.id === id),
+    compareCount: (state) => state.compareList.length,
   },
 
   actions: {
@@ -141,6 +146,37 @@ export const useVolunteerStore = defineStore('volunteer', {
         window.URL.revokeObjectURL(url)
       } finally {
         this.loading.pdf = false
+      }
+    },
+
+    addToCompare(college) {
+      if (this.compareList.length >= this.maxCompare) {
+        return { success: false, message: `最多对比${this.maxCompare}所院校` }
+      }
+      if (this.isInCompare(college.id)) {
+        return { success: false, message: '该院校已在对比列表中' }
+      }
+      this.compareList.push(college)
+      return { success: true, message: '已添加成功' }
+    },
+
+    removeFromCompare(id) {
+      const idx = this.compareList.findIndex((c) => c.id === id)
+      if (idx >= 0) {
+        this.compareList.splice(idx, 1)
+      }
+    },
+
+    clearCompare() {
+      this.compareList = []
+    },
+
+    toggleCompare(college) {
+      if (this.isInCompare(college.id)) {
+        this.removeFromCompare(college.id)
+        return { added: false, message: '已移除对比' }
+      } else {
+        return this.addToCompare(college)
       }
     },
   },

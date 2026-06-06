@@ -66,16 +66,26 @@
                 <h3 class="college-name" @click="goDetail(item.college.id)">
                   {{ item.college.name }}
                 </h3>
-                <div class="prob-wrap">
-                  <div class="probability-bar" style="width: 180px">
-                    <div
-                      class="inner"
-                      :style="{ width: `${item.probability * 100}%`, background: probColor(item.probability) }"
-                    ></div>
+                <div class="header-actions">
+                  <el-button
+                    :type="volunteerStore.isInCompare(item.college.id) ? 'success' : 'warning'"
+                    link
+                    size="small"
+                    @click.stop="handleToggleCompare(item.college)"
+                  >
+                    {{ volunteerStore.isInCompare(item.college.id) ? '已加入对比' : '加入对比' }}
+                  </el-button>
+                  <div class="prob-wrap">
+                    <div class="probability-bar" style="width: 180px">
+                      <div
+                        class="inner"
+                        :style="{ width: `${item.probability * 100}%`, background: probColor(item.probability) }"
+                      ></div>
+                    </div>
+                    <span class="prob-value" :style="{ color: probColor(item.probability) }">
+                      {{ (item.probability * 100).toFixed(1) }}%
+                    </span>
                   </div>
-                  <span class="prob-value" :style="{ color: probColor(item.probability) }">
-                    {{ (item.probability * 100).toFixed(1) }}%
-                  </span>
                 </div>
               </div>
               <div class="item-meta">
@@ -193,6 +203,16 @@ async function handleExport() {
     ElMessage.success('PDF 下载成功')
   } catch (e) {
     ElMessage.error('导出失败')
+  }
+}
+
+function handleToggleCompare(college) {
+  const res = volunteerStore.toggleCompare(college)
+  const msg = res.message || (res.added === false ? '已移除对比' : '操作成功')
+  if (res.success === false) {
+    ElMessage.warning(msg)
+  } else {
+    ElMessage.success(msg)
   }
 }
 </script>
@@ -335,6 +355,13 @@ async function handleExport() {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 6px;
+  gap: 16px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .college-name {

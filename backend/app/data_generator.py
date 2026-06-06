@@ -1,7 +1,7 @@
 import random
 from typing import List, Dict
 from .schemas import (
-    College, Major, AdmissionData, CollegeLevel, CollegeType
+    College, Major, AdmissionData, CollegeLevel, CollegeType, DisciplineLevel
 )
 
 random.seed(42)
@@ -583,7 +583,7 @@ SUBJECT_COMBINATIONS = [
 ]
 
 
-def _generate_majors(college_type: CollegeType, count: int = 8) -> List[Major]:
+def _generate_majors(college_type: CollegeType, level: CollegeLevel, count: int = 8) -> List[Major]:
     type_priority = {
         CollegeType.COMPREHENSIVE: ["计算机科学与技术", "金融学", "法学", "汉语言文学", "数学与应用数学", "英语", "工商管理", "软件工程", "经济学", "统计学", "心理学", "新闻学"],
         CollegeType.SCIENCE: ["计算机科学与技术", "软件工程", "电子信息工程", "通信工程", "自动化", "机械工程", "材料科学与工程", "人工智能", "数据科学与大数据技术", "电气工程及其自动化", "土木工程", "机器人工程", "车辆工程", "航空航天工程", "新能源材料与器件"],
@@ -598,9 +598,18 @@ def _generate_majors(college_type: CollegeType, count: int = 8) -> List[Major]:
         CollegeType.MILITARY: ["侦查学", "治安学", "法学", "刑事科学技术", "网络安全与执法", "公安管理学", "涉外警务", "警务指挥与战术"],
     }
 
+    level_distribution = {
+        CollegeLevel.C9: [DisciplineLevel.A_PLUS, DisciplineLevel.A, DisciplineLevel.A, DisciplineLevel.A_MINUS, DisciplineLevel.A_MINUS, DisciplineLevel.B_PLUS, DisciplineLevel.B_PLUS, DisciplineLevel.B],
+        CollegeLevel.PROJECT_985: [DisciplineLevel.A, DisciplineLevel.A_MINUS, DisciplineLevel.A_MINUS, DisciplineLevel.B_PLUS, DisciplineLevel.B_PLUS, DisciplineLevel.B, DisciplineLevel.B, DisciplineLevel.B_MINUS],
+        CollegeLevel.PROJECT_211: [DisciplineLevel.A_MINUS, DisciplineLevel.B_PLUS, DisciplineLevel.B_PLUS, DisciplineLevel.B, DisciplineLevel.B, DisciplineLevel.B_MINUS, DisciplineLevel.B_MINUS, DisciplineLevel.C_PLUS],
+        CollegeLevel.DOUBLE_FIRST_CLASS: [DisciplineLevel.B_PLUS, DisciplineLevel.B, DisciplineLevel.B, DisciplineLevel.B_MINUS, DisciplineLevel.B_MINUS, DisciplineLevel.C_PLUS, DisciplineLevel.C_PLUS, DisciplineLevel.C],
+        CollegeLevel.ORDINARY: [DisciplineLevel.B, DisciplineLevel.B_MINUS, DisciplineLevel.B_MINUS, DisciplineLevel.C_PLUS, DisciplineLevel.C_PLUS, DisciplineLevel.C, DisciplineLevel.C, DisciplineLevel.C_MINUS],
+    }
+
     majors_list = []
     available = type_priority.get(college_type, type_priority[CollegeType.COMPREHENSIVE])
     selected = available[:count]
+    dist = level_distribution.get(level, level_distribution[CollegeLevel.ORDINARY])
     for idx, name in enumerate(selected):
         if name in MAJOR_DATABASE:
             m = MAJOR_DATABASE[name]
@@ -611,6 +620,7 @@ def _generate_majors(college_type: CollegeType, count: int = 8) -> List[Major]:
                 employment_direction=m["employment_direction"],
                 typical_positions=m["typical_positions"],
                 description=m["description"],
+                discipline_level=dist[idx % len(dist)] if idx < len(dist) else random.choice(dist),
             ))
     return majors_list
 
@@ -637,9 +647,25 @@ def _generate_admission_data(base_rank: int, base_score: int) -> List[AdmissionD
 
 def generate_colleges() -> List[College]:
     colleges = []
+    employment_rate_by_level = {
+        CollegeLevel.C9: (0.95, 0.98),
+        CollegeLevel.PROJECT_985: (0.92, 0.97),
+        CollegeLevel.PROJECT_211: (0.88, 0.94),
+        CollegeLevel.DOUBLE_FIRST_CLASS: (0.85, 0.92),
+        CollegeLevel.ORDINARY: (0.78, 0.88),
+    }
+    salary_by_level = {
+        CollegeLevel.C9: (180000, 280000),
+        CollegeLevel.PROJECT_985: (150000, 240000),
+        CollegeLevel.PROJECT_211: (120000, 190000),
+        CollegeLevel.DOUBLE_FIRST_CLASS: (100000, 160000),
+        CollegeLevel.ORDINARY: (70000, 130000),
+    }
     for idx, tpl in enumerate(COLLEGE_TEMPLATES):
-        majors = _generate_majors(tpl["college_type"], count=random.randint(6, 12))
+        majors = _generate_majors(tpl["college_type"], tpl["level"], count=random.randint(6, 12))
         admission_data = _generate_admission_data(tpl["base_rank"], tpl["base_score"])
+        er_range = employment_rate_by_level.get(tpl["level"], employment_rate_by_level[CollegeLevel.ORDINARY])
+        sal_range = salary_by_level.get(tpl["level"], salary_by_level[CollegeLevel.ORDINARY])
         colleges.append(College(
             id=f"C{idx + 1:04d}",
             name=tpl["name"],
@@ -651,6 +677,8 @@ def generate_colleges() -> List[College]:
             majors=majors,
             admission_data=admission_data,
             tags=tpl["tags"],
+            employment_rate=round(random.uniform(er_range[0], er_range[1]), 4),
+            average_salary=random.randint(sal_range[0], sal_range[1]),
         ))
     return colleges
 

@@ -25,6 +25,12 @@ const routes = [
     component: () => import('../views/PlanView.vue'),
     meta: { title: '志愿方案' },
   },
+  {
+    path: '/compare',
+    name: 'CollegeCompare',
+    component: () => import('../views/CollegeCompareView.vue'),
+    meta: { title: '院校对比' },
+  },
 ]
 
 const router = createRouter({

@@ -27,6 +27,16 @@
             <el-icon><Tickets /></el-icon>
             <span>志愿方案</span>
           </el-menu-item>
+          <el-menu-item index="/compare">
+            <span style="font-size: 16px; margin-right: 4px">📊</span>
+            <span>院校对比</span>
+            <el-badge
+              v-if="volunteerStore.compareCount > 0"
+              :value="volunteerStore.compareCount"
+              :max="volunteerStore.maxCompare"
+              class="compare-badge"
+            />
+          </el-menu-item>
         </el-menu>
       </div>
     </el-header>
@@ -138,5 +148,9 @@ onMounted(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.compare-badge {
+  margin-left: 4px;
 }
 </style>

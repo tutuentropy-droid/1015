@@ -89,6 +89,18 @@ class AdmissionData(BaseModel):
     subject_combination: Optional[str] = None
 
 
+class DisciplineLevel(str, Enum):
+    A_PLUS = "A+"
+    A = "A"
+    A_MINUS = "A-"
+    B_PLUS = "B+"
+    B = "B"
+    B_MINUS = "B-"
+    C_PLUS = "C+"
+    C = "C"
+    C_MINUS = "C-"
+
+
 class Major(BaseModel):
     id: str
     name: str
@@ -96,6 +108,7 @@ class Major(BaseModel):
     employment_direction: List[str]
     typical_positions: List[str]
     description: Optional[str] = None
+    discipline_level: Optional[DisciplineLevel] = None
 
 
 class College(BaseModel):
@@ -109,6 +122,8 @@ class College(BaseModel):
     majors: List[Major] = []
     admission_data: List[AdmissionData] = []
     tags: List[str] = []
+    employment_rate: Optional[float] = None
+    average_salary: Optional[int] = None
 
 
 class UserInput(BaseModel):

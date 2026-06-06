@@ -13,7 +13,28 @@
       <div class="section-card">
         <div class="detail-header">
           <div>
-            <h1 class="college-title">{{ volunteerStore.collegeDetail.name }}</h1>
+            <div class="detail-title-row">
+              <h1 class="college-title">{{ volunteerStore.collegeDetail.name }}</h1>
+              <el-button
+                :type="volunteerStore.isInCompare(volunteerStore.collegeDetail.id) ? 'success' : 'warning'"
+                size="default"
+                @click="handleToggleCompare"
+                style="margin-left: 16px"
+              >
+                <span style="margin-right: 4px">📊</span>
+                <span>{{ volunteerStore.isInCompare(volunteerStore.collegeDetail.id) ? '已加入对比' : '加入对比' }}</span>
+              </el-button>
+              <el-button
+                v-if="volunteerStore.compareCount > 0"
+                type="primary"
+                plain
+                size="default"
+                @click="goCompare"
+                style="margin-left: 8px"
+              >
+                查看对比 ({{ volunteerStore.compareCount }})
+              </el-button>
+            </div>
             <div class="college-submeta">
               <span>{{ volunteerStore.collegeDetail.province }} · {{ volunteerStore.collegeDetail.city }}</span>
               <el-tag type="primary" effect="plain" style="margin-left: 12px">
@@ -22,6 +43,26 @@
               <el-tag type="success" effect="plain" style="margin-left: 6px">
                 {{ volunteerStore.collegeDetail.college_type }}
               </el-tag>
+            </div>
+            <div class="college-stats">
+              <div class="stat-item">
+                <span class="stat-label">📊 就业率</span>
+                <span class="stat-value green">
+                  {{ (volunteerStore.collegeDetail.employment_rate * 100).toFixed(1) }}%
+                </span>
+              </div>
+              <div class="stat-divider"></div>
+              <div class="stat-item">
+                <span class="stat-label">💰 平均年薪</span>
+                <span class="stat-value blue">
+                  ¥{{ formatSalary(volunteerStore.collegeDetail.average_salary) }}
+                </span>
+              </div>
+              <div class="stat-divider"></div>
+              <div class="stat-item">
+                <span class="stat-label">📚 开设专业</span>
+                <span class="stat-value">{{ volunteerStore.collegeDetail.majors?.length || 0 }} 个</span>
+              </div>
             </div>
             <div class="tag-group" style="margin-top: 12px">
               <el-tag
@@ -53,6 +94,15 @@
               <div class="major-name">
                 <span style="color:#409eff">📖</span>
                 <span>{{ m.name }}</span>
+                <el-tag
+                  v-if="m.discipline_level"
+                  :type="getDisciplineTagType(m.discipline_level)"
+                  effect="light"
+                  size="small"
+                  style="margin-left: 8px"
+                >
+                  {{ m.discipline_level }}
+                </el-tag>
               </div>
               <div class="major-info">
                 <span class="major-label">选科要求：</span>
@@ -91,10 +141,12 @@
 
 <script setup>
 import { computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useVolunteerStore } from '../stores/volunteer'
 
 const route = useRoute()
+const router = useRouter()
 const volunteerStore = useVolunteerStore()
 
 const admissionDataList = computed(
@@ -112,6 +164,37 @@ watch(
     if (id) volunteerStore.fetchCollegeDetail(id)
   }
 )
+
+function formatSalary(salary) {
+  if (!salary) return '-'
+  if (salary >= 10000) {
+    return (salary / 10000).toFixed(1) + '万'
+  }
+  return salary.toString()
+}
+
+function getDisciplineTagType(level) {
+  const map = {
+    'A+': 'danger', A: 'danger', 'A-': 'danger',
+    'B+': 'warning', B: 'warning', 'B-': 'warning',
+    'C+': 'info', C: 'info', 'C-': 'info',
+  }
+  return map[level] || 'info'
+}
+
+function handleToggleCompare() {
+  const res = volunteerStore.toggleCompare(volunteerStore.collegeDetail)
+  const msg = res.message || (res.added === false ? '已移除对比' : '操作成功')
+  if (res.success === false) {
+    ElMessage.warning(msg)
+  } else {
+    ElMessage.success(msg)
+  }
+}
+
+function goCompare() {
+  router.push('/compare')
+}
 </script>
 
 <style scoped>
@@ -131,6 +214,12 @@ watch(
   padding: 8px 0;
 }
 
+.detail-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .college-title {
   font-size: 28px;
   font-weight: 700;
@@ -141,6 +230,47 @@ watch(
 .college-submeta {
   font-size: 15px;
   color: #475569;
+}
+
+.college-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #f0fdf4 100%);
+  border-radius: 10px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.stat-value.green {
+  color: #22c55e;
+}
+
+.stat-value.blue {
+  color: #3b82f6;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 40px;
+  background: #e2e8f0;
 }
 
 .college-desc {
@@ -171,6 +301,7 @@ watch(
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .major-info {
@@ -182,5 +313,12 @@ watch(
 
 .major-label {
   color: #94a3b8;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 16px 0;
 }
 </style>

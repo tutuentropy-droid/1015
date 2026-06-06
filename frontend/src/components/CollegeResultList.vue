@@ -62,6 +62,16 @@
               {{ t }}
             </el-tag>
           </div>
+          <div class="card-actions" @click.stop>
+            <el-button
+              :type="volunteerStore.isInCompare(p.college.id) ? 'success' : 'warning'"
+              size="small"
+              plain
+              @click="handleToggleCompare(p.college)"
+            >
+              {{ volunteerStore.isInCompare(p.college.id) ? '已加入对比' : '加入对比' }}
+            </el-button>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -70,6 +80,8 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { useVolunteerStore } from '../stores/volunteer'
 
 defineProps({
   predictions: {
@@ -79,6 +91,7 @@ defineProps({
 })
 
 const router = useRouter()
+const volunteerStore = useVolunteerStore()
 
 function categoryClass(cat) {
   const map = { 冲: 'reach', 稳: 'stable', 保: 'safe' }
@@ -93,6 +106,16 @@ function probColor(p) {
 
 function goDetail(id) {
   router.push(`/colleges/${id}`)
+}
+
+function handleToggleCompare(college) {
+  const res = volunteerStore.toggleCompare(college)
+  const msg = res.message || (res.added === false ? '已移除对比' : '操作成功')
+  if (res.success === false) {
+    ElMessage.warning(msg)
+  } else {
+    ElMessage.success(msg)
+  }
 }
 </script>
 
@@ -175,5 +198,13 @@ function goDetail(id) {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.card-actions {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

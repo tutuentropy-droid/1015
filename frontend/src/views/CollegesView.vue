@@ -75,10 +75,18 @@
         <el-table-column label="专业数" width="80" align="center">
           <template #default="{ row }">{{ row.majors?.length || 0 }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="100" align="center" fixed="right">
+        <el-table-column label="操作" width="200" align="center" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click="goDetail(row.id)">
               查看详情
+            </el-button>
+            <el-button
+              :type="volunteerStore.isInCompare(row.id) ? 'success' : 'warning'"
+              link
+              size="small"
+              @click="handleToggleCompare(row)"
+            >
+              {{ volunteerStore.isInCompare(row.id) ? '已加入' : '加入对比' }}
             </el-button>
           </template>
         </el-table-column>
@@ -90,6 +98,7 @@
 <script setup>
 import { reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useVolunteerStore } from '../stores/volunteer'
 
 const router = useRouter()
@@ -121,5 +130,15 @@ function resetFilters() {
 
 function goDetail(id) {
   router.push(`/colleges/${id}`)
+}
+
+function handleToggleCompare(college) {
+  const res = volunteerStore.toggleCompare(college)
+  const msg = res.message || (res.added === false ? '已移除对比' : '操作成功')
+  if (res.success === false) {
+    ElMessage.warning(msg)
+  } else {
+    ElMessage.success(msg)
+  }
 }
 </script>
