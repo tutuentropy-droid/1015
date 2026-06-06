@@ -51,7 +51,7 @@
           >
             <div class="major-card">
               <div class="major-name">
-                <el-icon color="#409eff"><Reading /></el-icon>
+                <span style="color:#409eff">📖</span>
                 <span>{{ m.name }}</span>
               </div>
               <div class="major-info">

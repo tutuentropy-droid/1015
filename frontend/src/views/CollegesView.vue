@@ -45,10 +45,9 @@
       <el-table v-else :data="volunteerStore.collegeList" stripe style="width: 100%">
         <el-table-column prop="name" label="院校名称" min-width="200">
           <template #default="{ row }">
-            <el-link type="primary" :underline="false" @click="goDetail(row.id)">
-              <el-icon><OfficeBuilding /></el-icon>
-              <span style="margin-left: 4px">{{ row.name }}</span>
-            </el-link>
+            <el-button type="primary" link size="small" @click="goDetail(row.id)">
+              {{ row.name }}
+            </el-button>
           </template>
         </el-table-column>
         <el-table-column prop="province" label="省份" width="90" />
@@ -62,7 +61,7 @@
         <el-table-column label="标签" min-width="240">
           <template #default="{ row }">
             <el-tag
-              v-for="(t, i) in row.tags.slice(0, 4)"
+              v-for="(t, i) in (row.tags || []).slice(0, 4)"
               :key="i"
               type="info"
               effect="plain"

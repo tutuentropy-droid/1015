@@ -6,10 +6,10 @@
           <div>
             <h1 class="plan-title">🎓 志愿填报方案</h1>
             <p class="plan-subtitle">
-              {{ volunteerStore.volunteerPlan.userInput.province }} 考生 ·
-              {{ volunteerStore.volunteerPlan.userInput.score }} 分 ·
-              位次 {{ volunteerStore.volunteerPlan.userInput.rank }} ·
-              {{ volunteerStore.volunteerPlan.userInput.subject_combination }}
+              {{ volunteerStore.volunteerPlan.user_input.province }} 考生 ·
+              {{ volunteerStore.volunteerPlan.user_input.score }} 分 ·
+              位次 {{ volunteerStore.volunteerPlan.user_input.rank }} ·
+              {{ volunteerStore.volunteerPlan.user_input.subject_combination }}
             </p>
           </div>
           <el-button type="success" size="large" :loading="volunteerStore.loading.pdf" @click="handleExport">
@@ -86,8 +86,7 @@
                 <span>{{ item.college.college_type }}</span>
               </div>
               <div class="item-major">
-                <el-icon color="#409eff"><Reading /></el-icon>
-                <span class="major-label">推荐专业：</span>
+                <span class="major-label">📚 推荐专业：</span>
                 <span class="major-name">{{ item.recommended_major.name }}</span>
               </div>
               <div class="item-major-desc">
@@ -113,8 +112,8 @@
                 </div>
               </div>
               <el-collapse class="admission-collapse">
-                <el-collapse-item :title="`查看近三年录取数据`" :name="item.order">
-                  <el-table :data="item.college.admission_data.slice(0, 9)" size="small" stripe>
+                <el-collapse-item :title="`查看近三年录取数据`" :name="String(item.order)">
+                  <el-table :data="(item.college.admission_data || []).slice(0, 9)" size="small" stripe>
                     <el-table-column prop="year" label="年份" width="80" />
                     <el-table-column prop="province" label="省份" width="100" />
                     <el-table-column prop="score" label="最低分" width="100" />
