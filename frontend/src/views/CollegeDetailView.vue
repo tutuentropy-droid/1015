@@ -122,6 +122,14 @@
       </div>
 
       <div class="section-card">
+        <h2 class="section-title">📈 近五年录取趋势分析</h2>
+        <ScoreTrendChart
+          :admission-data="admissionDataList"
+          :college-name="volunteerStore.collegeDetail?.name"
+        />
+      </div>
+
+      <div class="section-card">
         <h2 class="section-title">近年各省录取数据</h2>
         <el-table :data="admissionDataList" stripe max-height="500">
           <el-table-column prop="year" label="年份" width="80" sortable />
@@ -144,6 +152,7 @@ import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useVolunteerStore } from '../stores/volunteer'
+import ScoreTrendChart from '../components/ScoreTrendChart.vue'
 
 const route = useRoute()
 const router = useRouter()

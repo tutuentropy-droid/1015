@@ -44,6 +44,16 @@
         </div>
       </div>
 
+      <div class="section-card" style="margin-bottom: 20px">
+        <VolunteerWarning
+          :volunteers="volunteerStore.volunteerPlan.volunteers"
+          :reach-count="volunteerStore.volunteerPlan.reach_count"
+          :stable-count="volunteerStore.volunteerPlan.stable_count"
+          :safe-count="volunteerStore.volunteerPlan.safe_count"
+          :overall-success-probability="volunteerStore.volunteerPlan.overall_success_probability"
+        />
+      </div>
+
       <div class="section-card">
         <h2 class="section-title">推荐志愿顺序</h2>
         <div class="volunteer-list">
@@ -122,7 +132,15 @@
                 </div>
               </div>
               <el-collapse class="admission-collapse">
-                <el-collapse-item :title="`查看近三年录取数据`" :name="String(item.order)">
+                <el-collapse-item :title="`📊 查看历年录取趋势与数据`" :name="String(item.order)">
+                  <div style="margin-bottom: 16px">
+                    <ScoreTrendChart
+                      :admission-data="item.college.admission_data || []"
+                      :college-name="item.college.name"
+                      :user-score="volunteerStore.volunteerPlan.user_input.score"
+                      :user-rank="volunteerStore.volunteerPlan.user_input.rank"
+                    />
+                  </div>
                   <el-table :data="(item.college.admission_data || []).slice(0, 9)" size="small" stripe>
                     <el-table-column prop="year" label="年份" width="80" />
                     <el-table-column prop="province" label="省份" width="100" />
@@ -174,6 +192,8 @@ import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useVolunteerStore } from '../stores/volunteer'
+import ScoreTrendChart from '../components/ScoreTrendChart.vue'
+import VolunteerWarning from '../components/VolunteerWarning.vue'
 
 const router = useRouter()
 const volunteerStore = useVolunteerStore()
