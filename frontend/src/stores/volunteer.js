@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { metaApi, collegeApi, predictApi } from '../api'
+import { metaApi, collegeApi, predictApi, subjectApi } from '../api'
 
 export const useVolunteerStore = defineStore('volunteer', {
   state: () => ({
@@ -8,6 +8,8 @@ export const useVolunteerStore = defineStore('volunteer', {
     cities: [],
     majorDirections: [],
     categories: [],
+    allSubjects: [],
+    newGaokaoProvinces: [],
 
     userInput: {
       province: '',
@@ -29,6 +31,10 @@ export const useVolunteerStore = defineStore('volunteer', {
     compareList: [],
     maxCompare: 5,
 
+    subjectAnalysisResult: null,
+    subjectCompareResult: null,
+    favoriteColleges: [],
+
     loading: {
       meta: false,
       colleges: false,
@@ -36,6 +42,8 @@ export const useVolunteerStore = defineStore('volunteer', {
       predict: false,
       plan: false,
       pdf: false,
+      subjectAnalysis: false,
+      subjectCompare: false,
     },
   }),
 
@@ -45,6 +53,8 @@ export const useVolunteerStore = defineStore('volunteer', {
     safeColleges: (state) => state.predictions.filter((p) => p.category === '保'),
     isInCompare: (state) => (id) => state.compareList.some((c) => c.id === id),
     compareCount: (state) => state.compareList.length,
+    isFavorite: (state) => (id) => state.favoriteColleges.some((c) => c.id === id),
+    favoriteCount: (state) => state.favoriteColleges.length,
   },
 
   actions: {
@@ -52,18 +62,22 @@ export const useVolunteerStore = defineStore('volunteer', {
       if (this.provinces.length) return
       this.loading.meta = true
       try {
-        const [p, s, c, m, cat] = await Promise.all([
+        const [p, s, c, m, cat, subs, ngp] = await Promise.all([
           metaApi.getProvinces(),
           metaApi.getSubjectCombinations(),
           metaApi.getCities(),
           metaApi.getMajorDirections(),
           metaApi.getCategories(),
+          metaApi.getAllSubjects(),
+          metaApi.getNewGaokaoProvinces(),
         ])
         this.provinces = p
         this.subjectCombinations = s
         this.cities = c
         this.majorDirections = m
         this.categories = cat
+        this.allSubjects = subs
+        this.newGaokaoProvinces = ngp
       } finally {
         this.loading.meta = false
       }
@@ -177,6 +191,51 @@ export const useVolunteerStore = defineStore('volunteer', {
         return { added: false, message: '已移除对比' }
       } else {
         return this.addToCompare(college)
+      }
+    },
+
+    async analyzeSubjects(subjects, province, collegeIds = []) {
+      this.loading.subjectAnalysis = true
+      try {
+        this.subjectAnalysisResult = await subjectApi.analyze({
+          subjects,
+          province,
+          college_ids: collegeIds,
+        })
+        return this.subjectAnalysisResult
+      } finally {
+        this.loading.subjectAnalysis = false
+      }
+    },
+
+    async compareSubjectCombinations(combinations, province, collegeIds = []) {
+      this.loading.subjectCompare = true
+      try {
+        this.subjectCompareResult = await subjectApi.compare({
+          combinations,
+          province,
+          college_ids: collegeIds,
+        })
+        return this.subjectCompareResult
+      } finally {
+        this.loading.subjectCompare = false
+      }
+    },
+
+    toggleFavorite(college) {
+      if (this.isFavorite(college.id)) {
+        this.removeFavorite(college.id)
+        return { added: false, message: '已取消收藏' }
+      } else {
+        this.favoriteColleges.push(college)
+        return { added: true, message: '已加入收藏' }
+      }
+    },
+
+    removeFavorite(id) {
+      const idx = this.favoriteColleges.findIndex((c) => c.id === id)
+      if (idx >= 0) {
+        this.favoriteColleges.splice(idx, 1)
       }
     },
   },

@@ -75,10 +75,18 @@
         <el-table-column label="专业数" width="80" align="center">
           <template #default="{ row }">{{ row.majors?.length || 0 }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="200" align="center" fixed="right">
+        <el-table-column label="操作" width="260" align="center" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click="goDetail(row.id)">
               查看详情
+            </el-button>
+            <el-button
+              :type="volunteerStore.isFavorite(row.id) ? 'danger' : 'success'"
+              link
+              size="small"
+              @click="handleToggleFavorite(row)"
+            >
+              {{ volunteerStore.isFavorite(row.id) ? '已收藏' : '收藏' }}
             </el-button>
             <el-button
               :type="volunteerStore.isInCompare(row.id) ? 'success' : 'warning'"
@@ -140,5 +148,10 @@ function handleToggleCompare(college) {
   } else {
     ElMessage.success(msg)
   }
+}
+
+function handleToggleFavorite(college) {
+  const res = volunteerStore.toggleFavorite(college)
+  ElMessage.success(res.message)
 }
 </script>

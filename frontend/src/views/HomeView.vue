@@ -7,6 +7,16 @@
           基于近三年录取数据，结合线性回归预测模型，智能分析冲稳保梯度，
           为您生成科学合理的志愿填报方案。
         </p>
+        <div class="hero-actions">
+          <el-button type="primary" size="large" @click="scrollToForm">
+            <el-icon><MagicStick /></el-icon>
+            <span>立即生成方案</span>
+          </el-button>
+          <el-button size="large" @click="$router.push('/subject-analysis')" style="margin-left: 12px">
+            <span style="margin-right: 4px">📚</span>
+            <span>选科影响分析</span>
+          </el-button>
+        </div>
         <div class="hero-stats">
           <div class="stat-item">
             <div class="stat-number">{{ volunteerStore.provinces.length }}</div>
@@ -286,6 +296,13 @@ function goPlan() {
   router.push('/plan')
 }
 
+function scrollToForm() {
+  const formCard = document.querySelector('.hero-banner')?.nextElementSibling
+  if (formCard) {
+    formCard.scrollIntoView({ behavior: 'smooth' })
+  }
+}
+
 async function handleExport() {
   try {
     await volunteerStore.exportPdf()
@@ -320,6 +337,10 @@ async function handleExport() {
   line-height: 1.7;
   margin: 0 0 24px 0;
   max-width: 600px;
+}
+
+.hero-actions {
+  margin-bottom: 24px;
 }
 
 .hero-stats {

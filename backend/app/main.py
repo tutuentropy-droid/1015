@@ -4,7 +4,10 @@ from fastapi.responses import StreamingResponse
 from typing import List, Optional
 from io import BytesIO
 from .schemas import (
-    College, UserInput, CollegePrediction, VolunteerPlan, Category
+    College, UserInput, CollegePrediction, VolunteerPlan, Category,
+    SubjectAnalysisRequest, SubjectAnalysisResult,
+    CombinationCompareRequest, CombinationCompareResult,
+    SubjectRequirementRule
 )
 from .data_generator import (
     get_all_provinces, get_all_subject_combinations, get_all_cities, get_all_major_directions
@@ -12,6 +15,10 @@ from .data_generator import (
 from .algorithms import filter_and_predict, generate_volunteer_plan
 from .pdf_export import generate_plan_pdf
 from .database import COLLEGES
+from .subject_analysis import (
+    analyze_subjects, compare_combinations, get_subject_requirements,
+    NEW_GAO_KAO_PROVINCES, PROVINCE_POLICY
+)
 
 app = FastAPI(
     title="高考志愿填报决策系统",
@@ -105,3 +112,43 @@ def export_plan_pdf(plan: VolunteerPlan):
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=volunteer_plan.pdf"},
     )
+
+
+@app.get("/api/meta/new-gaokao-provinces", response_model=List[dict], summary="获取新高考省份列表及模式")
+def list_new_gaokao_provinces():
+    return [
+        {"province": p, "policy": PROVINCE_POLICY.get(p, "3+1+2")}
+        for p in NEW_GAO_KAO_PROVINCES
+    ]
+
+
+@app.get("/api/meta/all-subjects", response_model=List[str], summary="获取所有可选科目")
+def list_all_subjects():
+    return ["物理", "化学", "生物", "历史", "政治", "地理"]
+
+
+@app.post("/api/subject/analyze", response_model=SubjectAnalysisResult, summary="分析选科组合可报专业")
+def analyze_subject_combination(req: SubjectAnalysisRequest):
+    result = analyze_subjects(
+        COLLEGES,
+        req.subjects,
+        req.province,
+        req.college_ids if req.college_ids else None,
+    )
+    return result
+
+
+@app.post("/api/subject/compare", response_model=CombinationCompareResult, summary="对比多个选科组合")
+def compare_subject_combinations(req: CombinationCompareRequest):
+    result = compare_combinations(
+        COLLEGES,
+        req.combinations,
+        req.province,
+        req.college_ids if req.college_ids else None,
+    )
+    return result
+
+
+@app.get("/api/subject/requirement/{major_name}", response_model=SubjectRequirementRule, summary="查询某个专业的选科要求")
+def get_major_subject_requirement(major_name: str, province: Optional[str] = None):
+    return get_subject_requirements(major_name, province)

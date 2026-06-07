@@ -23,6 +23,10 @@
             <el-icon><OfficeBuilding /></el-icon>
             <span>院校查询</span>
           </el-menu-item>
+          <el-menu-item index="/subject-analysis">
+            <span style="font-size: 16px; margin-right: 4px">📚</span>
+            <span>选科分析</span>
+          </el-menu-item>
           <el-menu-item index="/plan" v-if="volunteerStore.volunteerPlan">
             <el-icon><Tickets /></el-icon>
             <span>志愿方案</span>

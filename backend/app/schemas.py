@@ -224,3 +224,63 @@ class MajorDetail(BaseModel):
     gender_ratio: str
     employment_prospect: EmploymentProspect
     subject_requirements: List[str] = []
+
+
+class SubjectRequirementRule(BaseModel):
+    major_id: str
+    major_name: str
+    province: str
+    required_subjects: List[str] = []
+    optional_subjects: List[str] = []
+    requirement_note: Optional[str] = None
+
+
+class SubjectAnalysisRequest(BaseModel):
+    subjects: List[str]
+    province: Optional[str] = None
+    college_ids: List[str] = []
+
+
+class MajorEligibility(BaseModel):
+    major: Major
+    eligible: bool
+    reason: Optional[str] = None
+    college_id: Optional[str] = None
+    college_name: Optional[str] = None
+
+
+class DisciplineGroup(BaseModel):
+    category: str
+    majors: List[MajorEligibility] = []
+    eligible_count: int = 0
+    total_count: int = 0
+
+
+class SubjectAnalysisResult(BaseModel):
+    subjects: List[str]
+    total_majors: int = 0
+    eligible_majors: int = 0
+    ineligible_majors: int = 0
+    eligible_rate: float = 0.0
+    discipline_groups: List[DisciplineGroup] = []
+    college_stats: List[Dict] = []
+
+
+class CombinationCompareRequest(BaseModel):
+    combinations: List[List[str]]
+    province: Optional[str] = None
+    college_ids: List[str] = []
+
+
+class CombinationCompareItem(BaseModel):
+    combination: List[str]
+    combination_label: str
+    total_majors: int = 0
+    eligible_majors: int = 0
+    ineligible_majors: int = 0
+    eligible_rate: float = 0.0
+    by_college: List[Dict] = []
+
+
+class CombinationCompareResult(BaseModel):
+    items: List[CombinationCompareItem] = []

@@ -16,6 +16,16 @@
             <div class="detail-title-row">
               <h1 class="college-title">{{ volunteerStore.collegeDetail.name }}</h1>
               <el-button
+                :type="volunteerStore.isFavorite(volunteerStore.collegeDetail.id) ? 'danger' : 'success'"
+                plain
+                size="default"
+                @click="handleToggleFavorite"
+                style="margin-left: 8px"
+              >
+                <el-icon><StarFilled v-if="volunteerStore.isFavorite(volunteerStore.collegeDetail.id)" /><Star v-else /></el-icon>
+                <span>{{ volunteerStore.isFavorite(volunteerStore.collegeDetail.id) ? '已收藏' : '收藏院校' }}</span>
+              </el-button>
+              <el-button
                 :type="volunteerStore.isInCompare(volunteerStore.collegeDetail.id) ? 'success' : 'warning'"
                 size="default"
                 @click="handleToggleCompare"
@@ -199,6 +209,11 @@ function handleToggleCompare() {
   } else {
     ElMessage.success(msg)
   }
+}
+
+function handleToggleFavorite() {
+  const res = volunteerStore.toggleFavorite(volunteerStore.collegeDetail)
+  ElMessage.success(res.message)
 }
 
 function goCompare() {

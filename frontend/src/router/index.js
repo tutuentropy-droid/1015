@@ -31,6 +31,12 @@ const routes = [
     component: () => import('../views/CollegeCompareView.vue'),
     meta: { title: '院校对比' },
   },
+  {
+    path: '/subject-analysis',
+    name: 'SubjectAnalysis',
+    component: () => import('../views/SubjectAnalysisView.vue'),
+    meta: { title: '选科影响分析' },
+  },
 ]
 
 const router = createRouter({

@@ -22,6 +22,8 @@ export const metaApi = {
   getCities: () => api.get('/meta/cities'),
   getMajorDirections: () => api.get('/meta/major-directions'),
   getCategories: () => api.get('/meta/categories'),
+  getNewGaokaoProvinces: () => api.get('/meta/new-gaokao-provinces'),
+  getAllSubjects: () => api.get('/meta/all-subjects'),
 }
 
 export const collegeApi = {
@@ -37,6 +39,13 @@ export const predictApi = {
       responseType: 'blob',
       timeout: 30000,
     }),
+}
+
+export const subjectApi = {
+  analyze: (data) => api.post('/subject/analyze', data),
+  compare: (data) => api.post('/subject/compare', data),
+  getRequirement: (majorName, province) =>
+    api.get(`/subject/requirement/${encodeURIComponent(majorName)}`, { params: { province } }),
 }
 
 export default api
