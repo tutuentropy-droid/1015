@@ -1,7 +1,8 @@
 import random
 from typing import List, Dict
 from .schemas import (
-    College, Major, AdmissionData, CollegeLevel, CollegeType, DisciplineLevel
+    College, Major, AdmissionData, CollegeLevel, CollegeType, DisciplineLevel,
+    MajorDetail, DisciplineCategory, StudyDifficulty, EmploymentProspect, SalaryRange
 )
 
 random.seed(42)

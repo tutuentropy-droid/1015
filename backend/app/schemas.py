@@ -168,3 +168,59 @@ class VolunteerPlan(BaseModel):
     stable_count: int
     safe_count: int
     overall_success_probability: float
+
+
+class DisciplineCategory(str, Enum):
+    SCIENCE = "理学"
+    ENGINEERING = "工学"
+    AGRICULTURE = "农学"
+    MEDICINE = "医学"
+    LITERATURE = "文学"
+    LAW = "法学"
+    ECONOMICS = "经济学"
+    MANAGEMENT = "管理学"
+    ART = "艺术学"
+    EDUCATION = "教育学"
+    HISTORY = "历史学"
+    PHILOSOPHY = "哲学"
+
+
+class StudyDifficulty(str, Enum):
+    EASY = "轻松"
+    MODERATE = "适中"
+    HARD = "较难"
+    VERY_HARD = "非常难"
+
+
+class EmploymentProspect(str, Enum):
+    EXCELLENT = "极好"
+    GOOD = "良好"
+    NORMAL = "一般"
+    POOR = "较差"
+
+
+class SalaryRange(BaseModel):
+    fresh: int
+    three_years: int
+    five_years_plus: int
+
+
+class MajorDetail(BaseModel):
+    id: str
+    name: str
+    category: DisciplineCategory
+    major_type: str
+    brief_intro: str
+    introduction: str
+    core_courses: List[str]
+    employment_directions: List[str]
+    typical_positions: List[str]
+    salary_range: SalaryRange
+    postgraduate_ratio: float
+    suitable_traits: List[str]
+    unsuitable_people: List[str]
+    study_difficulty: StudyDifficulty
+    course_load: str
+    gender_ratio: str
+    employment_prospect: EmploymentProspect
+    subject_requirements: List[str] = []
