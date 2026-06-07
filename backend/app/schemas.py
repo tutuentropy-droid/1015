@@ -213,9 +213,10 @@ class MajorDetail(BaseModel):
     brief_intro: str
     introduction: str
     core_courses: List[str]
-    employment_directions: List[str]
+    employment_direction: List[str]
     typical_positions: List[str]
     salary_range: SalaryRange
+    employment_rate: float
     postgraduate_ratio: float
     suitable_traits: List[str]
     unsuitable_people: List[str]

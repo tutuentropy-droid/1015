@@ -48,4 +48,10 @@ export const subjectApi = {
     api.get(`/subject/requirement/${encodeURIComponent(majorName)}`, { params: { province } }),
 }
 
+export const majorApi = {
+  list: (params = {}) => api.get('/majors', { params }),
+  detail: (majorName) => api.get(`/majors/${encodeURIComponent(majorName)}`),
+  compare: (majorNames) => api.post('/majors/compare', majorNames),
+}
+
 export default api

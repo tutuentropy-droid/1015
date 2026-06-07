@@ -41,6 +41,16 @@
               class="compare-badge"
             />
           </el-menu-item>
+          <el-menu-item index="/major-compare">
+            <span style="font-size: 16px; margin-right: 4px">🎯</span>
+            <span>专业对比</span>
+            <el-badge
+              v-if="volunteerStore.majorCompareCount > 0"
+              :value="volunteerStore.majorCompareCount"
+              :max="volunteerStore.maxMajorCompare"
+              class="compare-badge"
+            />
+          </el-menu-item>
         </el-menu>
       </div>
     </el-header>

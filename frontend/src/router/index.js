@@ -37,6 +37,12 @@ const routes = [
     component: () => import('../views/SubjectAnalysisView.vue'),
     meta: { title: '选科影响分析' },
   },
+  {
+    path: '/major-compare',
+    name: 'MajorCompare',
+    component: () => import('../views/MajorCompareView.vue'),
+    meta: { title: '专业对比' },
+  },
 ]
 
 const router = createRouter({

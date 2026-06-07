@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from typing import List, Optional
@@ -10,7 +10,8 @@ from .schemas import (
     SubjectRequirementRule
 )
 from .data_generator import (
-    get_all_provinces, get_all_subject_combinations, get_all_cities, get_all_major_directions
+    get_all_provinces, get_all_subject_combinations, get_all_cities, get_all_major_directions,
+    get_all_majors, get_major_detail, compare_majors
 )
 from .algorithms import filter_and_predict, generate_volunteer_plan
 from .pdf_export import generate_plan_pdf
@@ -152,3 +153,33 @@ def compare_subject_combinations(req: CombinationCompareRequest):
 @app.get("/api/subject/requirement/{major_name}", response_model=SubjectRequirementRule, summary="查询某个专业的选科要求")
 def get_major_subject_requirement(major_name: str, province: Optional[str] = None):
     return get_subject_requirements(major_name, province)
+
+
+@app.get("/api/majors", summary="获取所有专业列表（带基本信息）")
+def list_majors(category: Optional[str] = None, keyword: Optional[str] = None):
+    majors = get_all_majors()
+    if category:
+        majors = [m for m in majors if m["category"] == category]
+    if keyword:
+        majors = [m for m in majors if keyword in m["name"] or keyword in m.get("brief_intro", "")]
+    return majors
+
+
+@app.get("/api/majors/{major_name}", summary="获取专业详情（含对比维度数据）")
+def get_major(major_name: str):
+    detail = get_major_detail(major_name)
+    if not detail:
+        raise HTTPException(status_code=404, detail="专业不存在")
+    return detail
+
+
+@app.post("/api/majors/compare", summary="对比多个专业")
+def compare_majors_endpoint(major_names: List[str] = Body(...)):
+    if len(major_names) < 2:
+        raise HTTPException(status_code=400, detail="至少选择 2 个专业进行对比")
+    if len(major_names) > 3:
+        raise HTTPException(status_code=400, detail="最多对比 3 个专业")
+    result = compare_majors(major_names)
+    if len(result) < 2:
+        raise HTTPException(status_code=400, detail="找到的有效专业不足 2 个")
+    return result

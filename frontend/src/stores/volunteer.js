@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { metaApi, collegeApi, predictApi, subjectApi } from '../api'
+import { metaApi, collegeApi, predictApi, subjectApi, majorApi } from '../api'
 
 export const useVolunteerStore = defineStore('volunteer', {
   state: () => ({
@@ -35,6 +35,11 @@ export const useVolunteerStore = defineStore('volunteer', {
     subjectCompareResult: null,
     favoriteColleges: [],
 
+    majorList: [],
+    majorCompareList: [],
+    maxMajorCompare: 3,
+    majorCompareResult: null,
+
     loading: {
       meta: false,
       colleges: false,
@@ -44,6 +49,8 @@ export const useVolunteerStore = defineStore('volunteer', {
       pdf: false,
       subjectAnalysis: false,
       subjectCompare: false,
+      majors: false,
+      majorCompare: false,
     },
   }),
 
@@ -55,6 +62,8 @@ export const useVolunteerStore = defineStore('volunteer', {
     compareCount: (state) => state.compareList.length,
     isFavorite: (state) => (id) => state.favoriteColleges.some((c) => c.id === id),
     favoriteCount: (state) => state.favoriteColleges.length,
+    isMajorInCompare: (state) => (name) => state.majorCompareList.some((m) => m.name === name),
+    majorCompareCount: (state) => state.majorCompareList.length,
   },
 
   actions: {
@@ -236,6 +245,63 @@ export const useVolunteerStore = defineStore('volunteer', {
       const idx = this.favoriteColleges.findIndex((c) => c.id === id)
       if (idx >= 0) {
         this.favoriteColleges.splice(idx, 1)
+      }
+    },
+
+    async fetchMajors(params = {}) {
+      if (this.majorList.length) return this.majorList
+      this.loading.majors = true
+      try {
+        this.majorList = await majorApi.list(params)
+        return this.majorList
+      } finally {
+        this.loading.majors = false
+      }
+    },
+
+    addMajorToCompare(major) {
+      if (this.majorCompareList.length >= this.maxMajorCompare) {
+        return { success: false, message: `最多对比${this.maxMajorCompare}个专业` }
+      }
+      if (this.isMajorInCompare(major.name)) {
+        return { success: false, message: '该专业已在对比列表中' }
+      }
+      this.majorCompareList.push(major)
+      return { success: true, message: '已添加成功' }
+    },
+
+    removeMajorFromCompare(majorName) {
+      const idx = this.majorCompareList.findIndex((m) => m.name === majorName)
+      if (idx >= 0) {
+        this.majorCompareList.splice(idx, 1)
+      }
+    },
+
+    clearMajorCompare() {
+      this.majorCompareList = []
+      this.majorCompareResult = null
+    },
+
+    toggleMajorCompare(major) {
+      if (this.isMajorInCompare(major.name)) {
+        this.removeMajorFromCompare(major.name)
+        return { added: false, message: '已移除对比' }
+      } else {
+        return this.addMajorToCompare(major)
+      }
+    },
+
+    async compareMajors() {
+      if (this.majorCompareList.length < 2) {
+        throw new Error('请至少选择 2 个专业')
+      }
+      this.loading.majorCompare = true
+      try {
+        const names = this.majorCompareList.map((m) => m.name)
+        this.majorCompareResult = await majorApi.compare(names)
+        return this.majorCompareResult
+      } finally {
+        this.loading.majorCompare = false
       }
     },
   },

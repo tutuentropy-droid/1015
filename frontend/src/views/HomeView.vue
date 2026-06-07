@@ -16,6 +16,10 @@
             <span style="margin-right: 4px">📚</span>
             <span>选科影响分析</span>
           </el-button>
+          <el-button size="large" @click="$router.push('/major-compare')" style="margin-left: 12px">
+            <span style="margin-right: 4px">🎯</span>
+            <span>专业对比</span>
+          </el-button>
         </div>
         <div class="hero-stats">
           <div class="stat-item">
