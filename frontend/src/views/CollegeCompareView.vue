@@ -228,21 +228,120 @@
           />
         </template>
       </div>
+
+      <div class="section-card">
+        <div class="mc-input-section">
+          <div>
+            <h2 class="section-title" style="margin-bottom: 6px">🎲 录取概率蒙特卡洛模拟</h2>
+            <p class="mc-section-desc">
+              输入你的分数和位次，基于历年分数线波动进行上千次随机模拟，对比各院校录取概率的稳定性与不确定性
+            </p>
+          </div>
+        </div>
+
+        <el-form :inline="true" :model="mcForm" class="mc-form" label-position="top">
+          <el-form-item label="省份">
+            <el-select v-model="mcForm.province" placeholder="请选择省份" style="width: 160px">
+              <el-option
+                v-for="p in volunteerStore.provinces"
+                :key="p"
+                :label="p"
+                :value="p"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="分数">
+            <el-input-number
+              v-model="mcForm.user_score"
+              :min="0"
+              :max="750"
+              placeholder="高考分数"
+              style="width: 140px"
+            />
+          </el-form-item>
+          <el-form-item label="位次">
+            <el-input-number
+              v-model="mcForm.user_rank"
+              :min="1"
+              :max="500000"
+              placeholder="全省位次"
+              style="width: 160px"
+            />
+          </el-form-item>
+          <el-form-item label="模拟次数">
+            <el-select v-model="mcForm.num_simulations" style="width: 120px">
+              <el-option :label="500" :value="500" />
+              <el-option :label="1000" :value="1000" />
+              <el-option :label="2000" :value="2000" />
+              <el-option :label="5000" :value="5000" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+
+        <MonteCarloHistogram
+          :results="volunteerStore.monteCarloResult?.results || []"
+          :common-bins="volunteerStore.monteCarloResult?.common_bins || []"
+          :num-simulations="volunteerStore.monteCarloResult?.num_simulations || mcForm.num_simulations"
+          :loading="volunteerStore.loading.monteCarlo"
+          :show-run-button="true"
+          :can-run="canRunMonteCarlo"
+          @run="handleRunMonteCarlo"
+        />
+      </div>
     </template>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useVolunteerStore } from '../stores/volunteer'
 import EmploymentAnalysis from '../components/EmploymentAnalysis.vue'
+import MonteCarloHistogram from '../components/MonteCarloHistogram.vue'
 
 const router = useRouter()
 const volunteerStore = useVolunteerStore()
 
 const selectedCompareCollegeId = ref('')
+
+const mcForm = reactive({
+  province: '',
+  user_score: 0,
+  user_rank: 0,
+  num_simulations: 1000,
+})
+
+const canRunMonteCarlo = computed(() => {
+  return (
+    volunteerStore.compareList.length > 0 &&
+    volunteerStore.compareList.length <= 5 &&
+    mcForm.province &&
+    mcForm.user_score > 0 &&
+    mcForm.user_rank > 0
+  )
+})
+
+async function handleRunMonteCarlo() {
+  if (!canRunMonteCarlo.value) {
+    ElMessage.warning('请先填写省份、分数和位次，并确保对比列表有院校')
+    return
+  }
+  try {
+    const collegeIds = volunteerStore.compareList.map(c => c.id)
+    await volunteerStore.runMonteCarlo({
+      college_ids: collegeIds,
+      province: mcForm.province,
+      user_score: mcForm.user_score,
+      user_rank: mcForm.user_rank,
+      num_simulations: mcForm.num_simulations,
+      num_bins: 20,
+    })
+    ElMessage.success('蒙特卡洛模拟完成')
+  } catch (e) {
+    ElMessage.error(e?.message || '模拟失败，请稍后重试')
+  }
+}
 
 const selectedEmploymentData = computed(() => {
   if (!selectedCompareCollegeId.value) return null
@@ -657,5 +756,27 @@ function isBest(idx, field, lowerIsBetter) {
 .compare-tip {
   font-size: 13px;
   color: #64748b;
+}
+
+.mc-input-section {
+  margin-bottom: 16px;
+}
+
+.mc-section-desc {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
+
+.mc-form {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 10px;
+}
+
+.mc-form .el-form-item {
+  margin-bottom: 0;
+  margin-right: 16px;
 }
 </style>

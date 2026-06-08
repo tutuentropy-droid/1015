@@ -7,13 +7,14 @@ from .schemas import (
     College, UserInput, CollegePrediction, VolunteerPlan, Category,
     SubjectAnalysisRequest, SubjectAnalysisResult,
     CombinationCompareRequest, CombinationCompareResult,
-    SubjectRequirementRule, EmploymentDataDetail
+    SubjectRequirementRule, EmploymentDataDetail,
+    MonteCarloRequest, MonteCarloResponse,
 )
 from .data_generator import (
     get_all_provinces, get_all_subject_combinations, get_all_cities, get_all_major_directions,
     get_all_majors, get_major_detail, compare_majors
 )
-from .algorithms import filter_and_predict, generate_volunteer_plan
+from .algorithms import filter_and_predict, generate_volunteer_plan, batch_monte_carlo_simulation
 from .pdf_export import generate_plan_pdf
 from .database import COLLEGES
 from .subject_analysis import (
@@ -208,3 +209,35 @@ def compare_colleges_employment(college_ids: List[str] = Body(...)):
                 result.append(c.employment_data)
                 break
     return result
+
+
+@app.post("/api/predict/monte-carlo", response_model=MonteCarloResponse, summary="蒙特卡洛模拟录取概率分布")
+def run_monte_carlo(req: MonteCarloRequest):
+    if not req.college_ids:
+        raise HTTPException(status_code=400, detail="请至少选择 1 所院校")
+    if len(req.college_ids) > 5:
+        raise HTTPException(status_code=400, detail="最多同时模拟 5 所院校")
+    target_colleges = []
+    for cid in req.college_ids:
+        found = False
+        for c in COLLEGES:
+            if c.id == cid:
+                target_colleges.append(c)
+                found = True
+                break
+        if not found:
+            raise HTTPException(status_code=404, detail=f"院校不存在: {cid}")
+    results, common_bins = batch_monte_carlo_simulation(
+        colleges=target_colleges,
+        user_score=req.user_score,
+        user_rank=req.user_rank,
+        province=req.province,
+        subject_combination=req.subject_combination,
+        num_simulations=req.num_simulations,
+        num_bins=req.num_bins,
+    )
+    return MonteCarloResponse(
+        results=results,
+        num_simulations=req.num_simulations,
+        common_bins=common_bins,
+    )

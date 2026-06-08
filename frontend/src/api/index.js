@@ -41,6 +41,7 @@ export const predictApi = {
       responseType: 'blob',
       timeout: 30000,
     }),
+  monteCarlo: (data) => api.post('/predict/monte-carlo', data),
 }
 
 export const subjectApi = {

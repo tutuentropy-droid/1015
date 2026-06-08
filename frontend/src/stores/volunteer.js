@@ -55,7 +55,10 @@ export const useVolunteerStore = defineStore('volunteer', {
       subjectCompare: false,
       majors: false,
       majorCompare: false,
+      monteCarlo: false,
     },
+
+    monteCarloResult: null,
   }),
 
   getters: {
@@ -331,6 +334,26 @@ export const useVolunteerStore = defineStore('volunteer', {
       } finally {
         this.loading.majorCompare = false
       }
+    },
+
+    async runMonteCarlo(params) {
+      if (!params || !params.college_ids || !params.college_ids.length) {
+        throw new Error('请至少选择 1 所院校')
+      }
+      if (!params.province || !params.user_score || !params.user_rank) {
+        throw new Error('请填写省份、分数和位次')
+      }
+      this.loading.monteCarlo = true
+      try {
+        this.monteCarloResult = await predictApi.monteCarlo(params)
+        return this.monteCarloResult
+      } finally {
+        this.loading.monteCarlo = false
+      }
+    },
+
+    clearMonteCarlo() {
+      this.monteCarloResult = null
     },
   },
 })

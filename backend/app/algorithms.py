@@ -4,7 +4,8 @@ from sklearn.linear_model import LinearRegression
 import numpy as np
 from .schemas import (
     College, UserInput, CollegePrediction, VolunteerItem,
-    VolunteerPlan, AdmissionData, Category, Major
+    VolunteerPlan, AdmissionData, Category, Major,
+    MonteCarloCollegeResult, MonteCarloHistogramBin
 )
 
 
@@ -238,3 +239,216 @@ def generate_volunteer_plan(
         safe_count=safe_count,
         overall_success_probability=round(overall_success, 4),
     )
+
+
+def _compute_histogram_bins(simulated_probs: List[float], num_bins: int) -> List[MonteCarloHistogramBin]:
+    if not simulated_probs:
+        return []
+    min_p = min(simulated_probs)
+    max_p = max(simulated_probs)
+    if min_p == max_p:
+        min_p = max(0.0, min_p - 0.05)
+        max_p = min(1.0, max_p + 0.05)
+    bin_width = (max_p - min_p) / num_bins
+    bins = []
+    for i in range(num_bins):
+        bin_start = min_p + i * bin_width
+        bin_end = bin_start + bin_width
+        if i == num_bins - 1:
+            count = sum(1 for p in simulated_probs if bin_start <= p <= bin_end)
+        else:
+            count = sum(1 for p in simulated_probs if bin_start <= p < bin_end)
+        probability = count / len(simulated_probs) if simulated_probs else 0
+        bins.append(MonteCarloHistogramBin(
+            bin_start=round(bin_start, 4),
+            bin_end=round(bin_end, 4),
+            count=count,
+            probability=round(probability, 4),
+        ))
+    return bins
+
+
+def _compute_stability_score(simulated_probs: List[float], std: float) -> float:
+    if not simulated_probs:
+        return 0.0
+    mean_p = sum(simulated_probs) / len(simulated_probs)
+    if mean_p == 0:
+        return 0.0
+    cv = std / mean_p
+    stability = max(0.0, 1.0 - cv)
+    return round(stability, 4)
+
+
+def _get_volatility_rating(std: float, stability: float) -> str:
+    if std < 0.03 or stability >= 0.85:
+        return "录取概率极为稳定"
+    elif std < 0.06 or stability >= 0.7:
+        return "录取概率较为稳定"
+    elif std < 0.10 or stability >= 0.55:
+        return "存在一定波动"
+    elif std < 0.15 or stability >= 0.4:
+        return "波动较大，报考需谨慎"
+    else:
+        return "波动极大，不确定性高"
+
+
+def monte_carlo_simulation(
+    college: College,
+    user_score: int,
+    user_rank: int,
+    province: str,
+    subject_combination: Optional[str] = None,
+    num_simulations: int = 1000,
+    num_bins: int = 20,
+    current_year: int = 2026,
+) -> Optional[MonteCarloCollegeResult]:
+    province_data = _get_college_province_data(college, province)
+    if not province_data:
+        province_data = college.admission_data[:10]
+
+    years = sorted(list(set(d.year for d in province_data)))
+    if len(years) < 2:
+        return None
+
+    rank_by_year = {}
+    score_by_year = {}
+    for y in years:
+        year_data = [d for d in province_data if d.year == y]
+        if year_data:
+            rank_by_year[y] = int(sum(d.rank for d in year_data) / len(year_data))
+            score_by_year[y] = int(sum(d.score for d in year_data) / len(year_data))
+
+    sorted_years = sorted(rank_by_year.keys())
+    ranks = [rank_by_year[y] for y in sorted_years]
+    scores = [score_by_year[y] for y in sorted_years]
+
+    predicted_rank, rank_slope = _linear_regression_predict(sorted_years, ranks, current_year)
+    predicted_score, _ = _linear_regression_predict(sorted_years, scores, current_year)
+
+    predicted_rank = max(50, predicted_rank)
+    predicted_score = max(400, min(750, predicted_score))
+
+    base_probability = _calculate_probability(user_rank, int(predicted_rank), ranks)
+
+    rank_residuals = []
+    score_residuals = []
+    X = np.array(sorted_years).reshape(-1, 1)
+    y_rank = np.array(ranks)
+    y_score = np.array(scores)
+
+    if len(sorted_years) >= 2:
+        rank_model = LinearRegression()
+        rank_model.fit(X, y_rank)
+        rank_pred_all = rank_model.predict(X)
+        rank_residuals = list(y_rank - rank_pred_all)
+
+        score_model = LinearRegression()
+        score_model.fit(X, y_score)
+        score_pred_all = score_model.predict(X)
+        score_residuals = list(y_score - score_pred_all)
+
+    if len(rank_residuals) < 2:
+        rank_std = max(abs(predicted_rank * 0.05), 200)
+    else:
+        rank_std = float(np.std(rank_residuals, ddof=1))
+        if rank_std < 50:
+            rank_std = 50
+
+    if len(score_residuals) < 2:
+        score_std = max(predicted_score * 0.02, 5)
+    else:
+        score_std = float(np.std(score_residuals, ddof=1))
+        if score_std < 3:
+            score_std = 3
+
+    np.random.seed(42 + hash(college.id) % 1000)
+
+    simulated_probs = []
+    for _ in range(num_simulations):
+        noise_rank = np.random.normal(0, rank_std)
+        noise_score = np.random.normal(0, score_std)
+
+        sim_predicted_rank = max(50, predicted_rank + noise_rank)
+        sim_predicted_score = max(400, min(750, predicted_score + noise_score))
+
+        score_factor = 1.0
+        if predicted_score > 0:
+            score_factor = user_score / sim_predicted_score
+
+        combined_rank = sim_predicted_rank
+        if score_factor < 1.0:
+            combined_rank = sim_predicted_rank / max(0.5, score_factor)
+        elif score_factor > 1.0:
+            combined_rank = sim_predicted_rank * max(0.7, 1 / score_factor)
+
+        sim_prob = _calculate_probability(user_rank, int(combined_rank), ranks)
+        sim_prob = max(0.0, min(1.0, sim_prob))
+        simulated_probs.append(sim_prob)
+
+    simulated_probs_arr = np.array(simulated_probs)
+    mean_prob = float(np.mean(simulated_probs_arr))
+    std_prob = float(np.std(simulated_probs_arr, ddof=1))
+    median_prob = float(np.median(simulated_probs_arr))
+    min_prob = float(np.min(simulated_probs_arr))
+    max_prob = float(np.max(simulated_probs_arr))
+
+    ci_lower_95 = float(np.percentile(simulated_probs_arr, 2.5))
+    ci_upper_95 = float(np.percentile(simulated_probs_arr, 97.5))
+    ci_lower_90 = float(np.percentile(simulated_probs_arr, 5))
+    ci_upper_90 = float(np.percentile(simulated_probs_arr, 95))
+
+    histogram_bins = _compute_histogram_bins(simulated_probs, num_bins)
+
+    stability_score = _compute_stability_score(simulated_probs, std_prob)
+    volatility_rating = _get_volatility_rating(std_prob, stability_score)
+
+    return MonteCarloCollegeResult(
+        college_id=college.id,
+        college_name=college.name,
+        base_probability=round(base_probability, 4),
+        simulated_probability_mean=round(mean_prob, 4),
+        simulated_probability_std=round(std_prob, 4),
+        simulated_probability_median=round(median_prob, 4),
+        ci_lower_95=round(ci_lower_95, 4),
+        ci_upper_95=round(ci_upper_95, 4),
+        ci_lower_90=round(ci_lower_90, 4),
+        ci_upper_90=round(ci_upper_90, 4),
+        min_simulated_probability=round(min_prob, 4),
+        max_simulated_probability=round(max_prob, 4),
+        histogram_bins=histogram_bins,
+        stability_score=stability_score,
+        volatility_rating=volatility_rating,
+    )
+
+
+def batch_monte_carlo_simulation(
+    colleges: List[College],
+    user_score: int,
+    user_rank: int,
+    province: str,
+    subject_combination: Optional[str] = None,
+    num_simulations: int = 1000,
+    num_bins: int = 20,
+) -> Tuple[List[MonteCarloCollegeResult], List[float]]:
+    results = []
+    all_min = 1.0
+    all_max = 0.0
+    for college in colleges:
+        result = monte_carlo_simulation(
+            college, user_score, user_rank, province,
+            subject_combination, num_simulations, num_bins,
+        )
+        if result:
+            results.append(result)
+            all_min = min(all_min, result.ci_lower_95)
+            all_max = max(all_max, result.ci_upper_95)
+
+    all_min = max(0.0, all_min - 0.05)
+    all_max = min(1.0, all_max + 0.05)
+    if all_max - all_min < 0.1:
+        all_max = all_min + 0.1
+
+    bin_width = (all_max - all_min) / num_bins
+    common_bins = [round(all_min + i * bin_width, 4) for i in range(num_bins + 1)]
+
+    return results, common_bins

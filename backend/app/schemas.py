@@ -327,3 +327,44 @@ class CombinationCompareItem(BaseModel):
 
 class CombinationCompareResult(BaseModel):
     items: List[CombinationCompareItem] = []
+
+
+class MonteCarloHistogramBin(BaseModel):
+    bin_start: float
+    bin_end: float
+    count: int
+    probability: float
+
+
+class MonteCarloCollegeResult(BaseModel):
+    college_id: str
+    college_name: str
+    base_probability: float
+    simulated_probability_mean: float
+    simulated_probability_std: float
+    simulated_probability_median: float
+    ci_lower_95: float
+    ci_upper_95: float
+    ci_lower_90: float
+    ci_upper_90: float
+    min_simulated_probability: float
+    max_simulated_probability: float
+    histogram_bins: List[MonteCarloHistogramBin]
+    stability_score: float
+    volatility_rating: str
+
+
+class MonteCarloRequest(BaseModel):
+    college_ids: List[str]
+    user_score: int
+    user_rank: int
+    province: str
+    subject_combination: Optional[str] = None
+    num_simulations: int = Field(default=1000, ge=100, le=10000)
+    num_bins: int = Field(default=20, ge=5, le=50)
+
+
+class MonteCarloResponse(BaseModel):
+    results: List[MonteCarloCollegeResult]
+    num_simulations: int
+    common_bins: List[float]
