@@ -29,6 +29,8 @@ export const metaApi = {
 export const collegeApi = {
   list: (params = {}) => api.get('/colleges', { params }),
   detail: (id) => api.get(`/colleges/${id}`),
+  employment: (id) => api.get(`/colleges/${id}/employment`),
+  employmentCompare: (ids) => api.post('/colleges/employment/compare', ids),
 }
 
 export const predictApi = {

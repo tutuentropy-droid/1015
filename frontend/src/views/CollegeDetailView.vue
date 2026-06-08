@@ -140,6 +140,14 @@
       </div>
 
       <div class="section-card">
+        <h2 class="section-title">💼 就业数据深挖分析</h2>
+        <EmploymentAnalysis
+          :employment-data="volunteerStore.collegeDetail?.employment_data || volunteerStore.collegeEmployment"
+          :loading="volunteerStore.loading.employment"
+        />
+      </div>
+
+      <div class="section-card">
         <h2 class="section-title">近年各省录取数据</h2>
         <el-table :data="admissionDataList" stripe max-height="500">
           <el-table-column prop="year" label="年份" width="80" sortable />
@@ -163,6 +171,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useVolunteerStore } from '../stores/volunteer'
 import ScoreTrendChart from '../components/ScoreTrendChart.vue'
+import EmploymentAnalysis from '../components/EmploymentAnalysis.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -174,13 +183,21 @@ const admissionDataList = computed(
 
 onMounted(async () => {
   await volunteerStore.loadMeta()
-  volunteerStore.fetchCollegeDetail(route.params.id)
+  await volunteerStore.fetchCollegeDetail(route.params.id)
+  if (volunteerStore.collegeDetail && !volunteerStore.collegeDetail.employment_data) {
+    volunteerStore.fetchCollegeEmployment(route.params.id)
+  }
 })
 
 watch(
   () => route.params.id,
-  (id) => {
-    if (id) volunteerStore.fetchCollegeDetail(id)
+  async (id) => {
+    if (id) {
+      await volunteerStore.fetchCollegeDetail(id)
+      if (volunteerStore.collegeDetail && !volunteerStore.collegeDetail.employment_data) {
+        volunteerStore.fetchCollegeEmployment(id)
+      }
+    }
   }
 )
 

@@ -7,7 +7,7 @@ from .schemas import (
     College, UserInput, CollegePrediction, VolunteerPlan, Category,
     SubjectAnalysisRequest, SubjectAnalysisResult,
     CombinationCompareRequest, CombinationCompareResult,
-    SubjectRequirementRule
+    SubjectRequirementRule, EmploymentDataDetail
 )
 from .data_generator import (
     get_all_provinces, get_all_subject_combinations, get_all_cities, get_all_major_directions,
@@ -182,4 +182,29 @@ def compare_majors_endpoint(major_names: List[str] = Body(...)):
     result = compare_majors(major_names)
     if len(result) < 2:
         raise HTTPException(status_code=400, detail="找到的有效专业不足 2 个")
+    return result
+
+
+@app.get("/api/colleges/{college_id}/employment", response_model=EmploymentDataDetail, summary="获取院校就业详细数据")
+def get_college_employment(college_id: str):
+    for c in COLLEGES:
+        if c.id == college_id:
+            if c.employment_data:
+                return c.employment_data
+            raise HTTPException(status_code=404, detail="该院校暂无就业数据")
+    raise HTTPException(status_code=404, detail="院校不存在")
+
+
+@app.post("/api/colleges/employment/compare", summary="对比多所院校就业数据")
+def compare_colleges_employment(college_ids: List[str] = Body(...)):
+    if len(college_ids) < 1:
+        raise HTTPException(status_code=400, detail="至少选择 1 所院校")
+    if len(college_ids) > 5:
+        raise HTTPException(status_code=400, detail="最多对比 5 所院校")
+    result = []
+    for cid in college_ids:
+        for c in COLLEGES:
+            if c.id == cid and c.employment_data:
+                result.append(c.employment_data)
+                break
     return result

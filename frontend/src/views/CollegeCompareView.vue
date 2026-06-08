@@ -195,18 +195,84 @@
           </el-table>
         </div>
       </div>
+
+      <div class="section-card">
+        <h2 class="section-title">💼 就业数据深挖对比</h2>
+        <div v-if="volunteerStore.compareList.length < 1" class="empty-tip">
+          <el-empty description="请先添加院校进行对比" />
+        </div>
+        <template v-else>
+          <div class="employment-compare-toolbar">
+            <div class="college-switcher">
+              <span class="switcher-label">选择查看院校：</span>
+              <el-radio-group v-model="selectedCompareCollegeId" size="default">
+                <el-radio-button
+                  v-for="college in volunteerStore.compareList"
+                  :key="college.id"
+                  :value="college.id"
+                >
+                  {{ college.name }}
+                </el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="compare-tip">
+              <el-tag type="info" effect="plain" size="small">
+                💡 切换院校查看不同的就业数据分布
+              </el-tag>
+            </div>
+          </div>
+          <EmploymentAnalysis
+            v-if="selectedEmploymentData"
+            :employment-data="selectedEmploymentData"
+            :loading="volunteerStore.loading.employmentCompare"
+          />
+        </template>
+      </div>
     </template>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useVolunteerStore } from '../stores/volunteer'
+import EmploymentAnalysis from '../components/EmploymentAnalysis.vue'
 
 const router = useRouter()
 const volunteerStore = useVolunteerStore()
+
+const selectedCompareCollegeId = ref('')
+
+const selectedEmploymentData = computed(() => {
+  if (!selectedCompareCollegeId.value) return null
+  const list = volunteerStore.compareEmploymentData || []
+  const found = list.find(d => d.college_id === selectedCompareCollegeId.value)
+  if (found) return found
+  const college = volunteerStore.compareList.find(c => c.id === selectedCompareCollegeId.value)
+  return college?.employment_data || null
+})
+
+function loadEmploymentCompareData() {
+  const ids = volunteerStore.compareList.map(c => c.id)
+  if (ids.length) {
+    volunteerStore.fetchCompareEmployment(ids)
+    if (!selectedCompareCollegeId.value || !ids.includes(selectedCompareCollegeId.value)) {
+      selectedCompareCollegeId.value = ids[0]
+    }
+  }
+}
+
+onMounted(() => {
+  loadEmploymentCompareData()
+})
+
+watch(
+  () => volunteerStore.compareList.map(c => c.id).join(','),
+  () => {
+    loadEmploymentCompareData()
+  }
+)
 
 const compareRows = [
   { field: 'basic_info', label: '基本信息' },
@@ -557,5 +623,39 @@ function isBest(idx, field, lowerIsBetter) {
   font-weight: 600;
   color: #1e293b;
   margin: 0 0 16px 0;
+}
+
+.empty-tip {
+  padding: 40px 0;
+}
+
+.employment-compare-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 10px;
+}
+
+.college-switcher {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.switcher-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.compare-tip {
+  font-size: 13px;
+  color: #64748b;
 }
 </style>

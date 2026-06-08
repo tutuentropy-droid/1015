@@ -111,6 +111,47 @@ class Major(BaseModel):
     discipline_level: Optional[DisciplineLevel] = None
 
 
+class DataSource(str, Enum):
+    OFFICIAL = "官方就业报告"
+    THIRD_PARTY = "第三方统计"
+
+
+class EmploymentCityDistribution(BaseModel):
+    city: str
+    province: str
+    count: int
+    percentage: float
+    avg_salary: Optional[int] = None
+
+
+class EmploymentIndustryDistribution(BaseModel):
+    industry: str
+    count: int
+    percentage: float
+    avg_salary: Optional[int] = None
+
+
+class EmploymentPositionDistribution(BaseModel):
+    position_type: str
+    count: int
+    percentage: float
+    avg_salary: Optional[int] = None
+
+
+class EmploymentDataDetail(BaseModel):
+    college_id: str
+    college_name: str
+    year: int
+    total_graduates: int
+    employment_rate: float
+    average_salary: int
+    data_source: DataSource
+    city_distribution: List[EmploymentCityDistribution] = []
+    industry_distribution: List[EmploymentIndustryDistribution] = []
+    position_distribution: List[EmploymentPositionDistribution] = []
+    note: Optional[str] = None
+
+
 class College(BaseModel):
     id: str
     name: str
@@ -124,6 +165,7 @@ class College(BaseModel):
     tags: List[str] = []
     employment_rate: Optional[float] = None
     average_salary: Optional[int] = None
+    employment_data: Optional[EmploymentDataDetail] = None
 
 
 class UserInput(BaseModel):

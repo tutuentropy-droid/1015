@@ -24,12 +24,14 @@ export const useVolunteerStore = defineStore('volunteer', {
 
     collegeList: [],
     collegeDetail: null,
+    collegeEmployment: null,
 
     predictions: [],
     volunteerPlan: null,
 
     compareList: [],
     maxCompare: 5,
+    compareEmploymentData: [],
 
     subjectAnalysisResult: null,
     subjectCompareResult: null,
@@ -44,6 +46,8 @@ export const useVolunteerStore = defineStore('volunteer', {
       meta: false,
       colleges: false,
       detail: false,
+      employment: false,
+      employmentCompare: false,
       predict: false,
       plan: false,
       pdf: false,
@@ -107,6 +111,30 @@ export const useVolunteerStore = defineStore('volunteer', {
         this.collegeDetail = await collegeApi.detail(id)
       } finally {
         this.loading.detail = false
+      }
+    },
+
+    async fetchCollegeEmployment(id) {
+      this.loading.employment = true
+      try {
+        this.collegeEmployment = await collegeApi.employment(id)
+        return this.collegeEmployment
+      } finally {
+        this.loading.employment = false
+      }
+    },
+
+    async fetchCompareEmployment(collegeIds) {
+      if (!collegeIds || !collegeIds.length) {
+        this.compareEmploymentData = []
+        return []
+      }
+      this.loading.employmentCompare = true
+      try {
+        this.compareEmploymentData = await collegeApi.employmentCompare(collegeIds)
+        return this.compareEmploymentData
+      } finally {
+        this.loading.employmentCompare = false
       }
     },
 

@@ -667,8 +667,21 @@ def generate_colleges() -> List[College]:
         admission_data = _generate_admission_data(tpl["base_rank"], tpl["base_score"])
         er_range = employment_rate_by_level.get(tpl["level"], employment_rate_by_level[CollegeLevel.ORDINARY])
         sal_range = salary_by_level.get(tpl["level"], salary_by_level[CollegeLevel.ORDINARY])
+        employment_rate = round(random.uniform(er_range[0], er_range[1]), 4)
+        average_salary = random.randint(sal_range[0], sal_range[1])
+        college_id = f"C{idx + 1:04d}"
+        employment_data = generate_employment_data(
+            college_id=college_id,
+            college_name=tpl["name"],
+            college_province=tpl["province"],
+            college_city=tpl["city"],
+            level=tpl["level"],
+            college_type=tpl["college_type"],
+            base_employment_rate=employment_rate,
+            base_average_salary=average_salary,
+        )
         colleges.append(College(
-            id=f"C{idx + 1:04d}",
+            id=college_id,
             name=tpl["name"],
             province=tpl["province"],
             city=tpl["city"],
@@ -678,8 +691,9 @@ def generate_colleges() -> List[College]:
             majors=majors,
             admission_data=admission_data,
             tags=tpl["tags"],
-            employment_rate=round(random.uniform(er_range[0], er_range[1]), 4),
-            average_salary=random.randint(sal_range[0], sal_range[1]),
+            employment_rate=employment_rate,
+            average_salary=average_salary,
+            employment_data=employment_data,
         ))
     return colleges
 
@@ -1614,3 +1628,397 @@ def compare_majors(major_names: List[str]) -> List[Dict]:
         if detail:
             result.append(detail)
     return result
+
+
+CITY_PROVINCE_MAP = {
+    "北京": "北京", "上海": "上海", "广州": "广东", "深圳": "广东",
+    "杭州": "浙江", "南京": "江苏", "成都": "四川", "武汉": "湖北",
+    "西安": "陕西", "苏州": "江苏", "天津": "天津", "重庆": "重庆",
+    "青岛": "山东", "长沙": "湖南", "郑州": "河南", "厦门": "福建",
+    "合肥": "安徽", "福州": "福建", "济南": "山东", "大连": "辽宁",
+    "沈阳": "辽宁", "哈尔滨": "黑龙江", "长春": "吉林", "南昌": "江西",
+    "南宁": "广西", "昆明": "云南", "贵阳": "贵州", "太原": "山西",
+    "石家庄": "河北", "兰州": "甘肃", "乌鲁木齐": "新疆", "呼和浩特": "内蒙古",
+    "海口": "海南", "银川": "宁夏", "西宁": "青海", "拉萨": "西藏",
+    "宁波": "浙江", "无锡": "江苏", "佛山": "广东", "东莞": "广东",
+    "珠海": "广东", "中山": "广东", "温州": "浙江", "金华": "浙江",
+    "烟台": "山东", "潍坊": "山东", "泉州": "福建", "徐州": "江苏",
+    "常州": "江苏", "南通": "江苏", "惠州": "广东", "汕头": "广东",
+    "咸阳": "陕西", "绵阳": "四川", "南充": "四川", "宜昌": "湖北",
+    "襄阳": "湖北", "湘潭": "湖南", "株洲": "湖南", "洛阳": "河南",
+    "开封": "河南", "秦皇岛": "河北", "保定": "河北", "唐山": "河北",
+    "延吉": "吉林", "石河子": "新疆", "雅安": "四川", "徐州": "江苏",
+    "威海": "山东", "扬州": "江苏", "镇江": "江苏", "桂林": "广西",
+    "三亚": "海南", "大理": "云南", "丽江": "云南", "包头": "内蒙古",
+}
+
+EMPLOYMENT_INDUSTRIES = [
+    "互联网/IT", "金融/银行/证券", "教育/培训", "医疗/医药/健康",
+    "政府/事业单位/国企", "制造业/工业", "房地产/建筑", "零售/快消/电商",
+    "咨询/专业服务", "文化传媒/广告", "能源/化工/环保", "汽车/交通/物流",
+    "通信/运营商", "航空航天/国防军工", "农业/食品", "其他",
+]
+
+EMPLOYMENT_POSITION_TYPES = [
+    "技术研发类", "产品/运营类", "市场/销售类", "职能管理类",
+    "设计/创意类", "金融/投资类", "教育/科研类", "医疗/医药类",
+    "生产/制造类", "公务员/事业单位", "服务/支持类", "其他",
+]
+
+CITY_SALARY_BASE = {
+    "北京": 180000, "上海": 185000, "深圳": 190000, "广州": 150000,
+    "杭州": 170000, "南京": 150000, "成都": 130000, "武汉": 130000,
+    "西安": 120000, "苏州": 150000, "天津": 135000, "重庆": 120000,
+    "青岛": 120000, "长沙": 120000, "郑州": 100000, "厦门": 140000,
+    "合肥": 130000, "福州": 120000, "济南": 115000, "大连": 115000,
+}
+
+INDUSTRY_SALARY_FACTOR = {
+    "互联网/IT": 1.3, "金融/银行/证券": 1.25, "教育/培训": 0.95,
+    "医疗/医药/健康": 1.1, "政府/事业单位/国企": 0.9, "制造业/工业": 0.95,
+    "房地产/建筑": 1.0, "零售/快消/电商": 0.9, "咨询/专业服务": 1.15,
+    "文化传媒/广告": 0.95, "能源/化工/环保": 1.0, "汽车/交通/物流": 0.95,
+    "通信/运营商": 1.1, "航空航天/国防军工": 1.05, "农业/食品": 0.8,
+    "其他": 0.9,
+}
+
+POSITION_SALARY_FACTOR = {
+    "技术研发类": 1.3, "产品/运营类": 1.1, "市场/销售类": 0.95,
+    "职能管理类": 0.95, "设计/创意类": 1.0, "金融/投资类": 1.25,
+    "教育/科研类": 0.9, "医疗/医药类": 1.05, "生产/制造类": 0.85,
+    "公务员/事业单位": 0.85, "服务/支持类": 0.8, "其他": 0.85,
+}
+
+COLLEGE_TYPE_INDUSTRY_BIAS = {
+    CollegeType.SCIENCE: {
+        "互联网/IT": 0.35, "通信/运营商": 0.08, "制造业/工业": 0.12,
+        "金融/银行/证券": 0.08, "政府/事业单位/国企": 0.08,
+        "航空航天/国防军工": 0.05, "能源/化工/环保": 0.05,
+        "汽车/交通/物流": 0.05, "咨询/专业服务": 0.04,
+    },
+    CollegeType.COMPREHENSIVE: {
+        "互联网/IT": 0.20, "金融/银行/证券": 0.15, "教育/培训": 0.10,
+        "政府/事业单位/国企": 0.10, "咨询/专业服务": 0.08,
+        "文化传媒/广告": 0.06, "零售/快消/电商": 0.06,
+        "制造业/工业": 0.06, "房地产/建筑": 0.05,
+    },
+    CollegeType.FINANCE: {
+        "金融/银行/证券": 0.45, "咨询/专业服务": 0.12,
+        "互联网/IT": 0.10, "零售/快消/电商": 0.08,
+        "政府/事业单位/国企": 0.08, "房地产/建筑": 0.05,
+    },
+    CollegeType.NORMAL: {
+        "教育/培训": 0.50, "政府/事业单位/国企": 0.15,
+        "文化传媒/广告": 0.08, "互联网/IT": 0.08,
+        "金融/银行/证券": 0.05,
+    },
+    CollegeType.MEDICAL: {
+        "医疗/医药/健康": 0.70, "政府/事业单位/国企": 0.10,
+        "教育/科研类": 0.08, "互联网/IT": 0.05,
+    },
+    CollegeType.AGRICULTURAL: {
+        "农业/食品": 0.30, "政府/事业单位/国企": 0.15,
+        "教育/培训": 0.12, "能源/化工/环保": 0.10,
+        "互联网/IT": 0.08, "制造业/工业": 0.08,
+    },
+    CollegeType.POLITICAL: {
+        "公务员/事业单位": 0.55, "政府/事业单位/国企": 0.15,
+        "教育/培训": 0.08, "金融/银行/证券": 0.06,
+    },
+    CollegeType.LANGUAGE: {
+        "教育/培训": 0.25, "文化传媒/广告": 0.15,
+        "零售/快消/电商": 0.12, "金融/银行/证券": 0.10,
+        "互联网/IT": 0.10, "咨询/专业服务": 0.08,
+    },
+    CollegeType.ART: {
+        "设计/创意类": 0.30, "文化传媒/广告": 0.25,
+        "教育/培训": 0.15, "互联网/IT": 0.10,
+    },
+    CollegeType.SPORT: {
+        "教育/培训": 0.35, "服务/支持类": 0.20,
+        "政府/事业单位/国企": 0.10, "文化传媒/广告": 0.08,
+    },
+    CollegeType.MILITARY: {
+        "公务员/事业单位": 0.60, "政府/事业单位/国企": 0.15,
+        "教育/培训": 0.08,
+    },
+}
+
+COLLEGE_TYPE_POSITION_BIAS = {
+    CollegeType.SCIENCE: {
+        "技术研发类": 0.45, "产品/运营类": 0.12, "公务员/事业单位": 0.08,
+        "金融/投资类": 0.06, "生产/制造类": 0.08, "教育/科研类": 0.07,
+    },
+    CollegeType.COMPREHENSIVE: {
+        "技术研发类": 0.18, "产品/运营类": 0.15, "市场/销售类": 0.12,
+        "职能管理类": 0.12, "金融/投资类": 0.10, "公务员/事业单位": 0.08,
+        "教育/科研类": 0.08,
+    },
+    CollegeType.FINANCE: {
+        "金融/投资类": 0.50, "职能管理类": 0.12, "市场/销售类": 0.10,
+        "咨询/专业服务": 0.08, "产品/运营类": 0.06,
+    },
+    CollegeType.NORMAL: {
+        "教育/科研类": 0.55, "公务员/事业单位": 0.15,
+        "职能管理类": 0.08, "市场/销售类": 0.05,
+    },
+    CollegeType.MEDICAL: {
+        "医疗/医药类": 0.65, "教育/科研类": 0.12,
+        "公务员/事业单位": 0.08, "技术研发类": 0.05,
+    },
+    CollegeType.AGRICULTURAL: {
+        "生产/制造类": 0.25, "教育/科研类": 0.18,
+        "公务员/事业单位": 0.15, "技术研发类": 0.10,
+        "市场/销售类": 0.08,
+    },
+    CollegeType.POLITICAL: {
+        "公务员/事业单位": 0.60, "职能管理类": 0.12,
+        "教育/科研类": 0.08, "市场/销售类": 0.05,
+    },
+    CollegeType.LANGUAGE: {
+        "教育/科研类": 0.28, "市场/销售类": 0.15,
+        "职能管理类": 0.12, "产品/运营类": 0.10,
+        "服务/支持类": 0.08,
+    },
+    CollegeType.ART: {
+        "设计/创意类": 0.45, "教育/科研类": 0.15,
+        "市场/销售类": 0.10, "产品/运营类": 0.08,
+    },
+    CollegeType.SPORT: {
+        "教育/科研类": 0.35, "服务/支持类": 0.25,
+        "市场/销售类": 0.10, "公务员/事业单位": 0.08,
+    },
+    CollegeType.MILITARY: {
+        "公务员/事业单位": 0.65, "教育/科研类": 0.12,
+        "职能管理类": 0.08,
+    },
+}
+
+
+def _generate_distribution(
+    bias: Dict[str, float],
+    all_items: List[str],
+    total_count: int,
+    base_salary: int,
+    salary_factor_map: Dict[str, float],
+) -> List[Dict]:
+    result = []
+    remaining = 1.0
+    remaining_items = [i for i in all_items if i not in bias]
+    for item, pct in bias.items():
+        pct = max(0.01, min(pct, remaining - 0.01 * max(0, len(remaining_items))))
+        count = int(total_count * pct)
+        if count > 0:
+            salary_factor = salary_factor_map.get(item, 1.0)
+            salary_noise = random.uniform(0.85, 1.15)
+            result.append({
+                "name": item,
+                "count": count,
+                "percentage": round(pct, 4),
+                "avg_salary": int(base_salary * salary_factor * salary_noise),
+            })
+        remaining -= pct
+    if remaining > 0 and remaining_items:
+        extra_pct = remaining / len(remaining_items)
+        for item in remaining_items:
+            if random.random() < 0.4:
+                count = int(total_count * extra_pct)
+                if count > 0:
+                    salary_factor = salary_factor_map.get(item, 1.0)
+                    salary_noise = random.uniform(0.85, 1.15)
+                    result.append({
+                        "name": item,
+                        "count": count,
+                        "percentage": round(extra_pct, 4),
+                        "avg_salary": int(base_salary * salary_factor * salary_noise),
+                    })
+    total_pct = sum(r["percentage"] for r in result)
+    if total_pct > 0:
+        for r in result:
+            r["percentage"] = round(r["percentage"] / total_pct, 4)
+    result.sort(key=lambda x: -x["percentage"])
+    return result
+
+
+def _generate_city_distribution(
+    college_province: str,
+    college_city: str,
+    level: CollegeLevel,
+    total_count: int,
+    base_salary: int,
+) -> List[Dict]:
+    tier1_cities = ["北京", "上海", "深圳", "广州", "杭州", "南京", "成都", "武汉", "西安", "苏州"]
+    province_capitals = {
+        "广东": ["广州", "深圳", "佛山", "东莞"], "江苏": ["南京", "苏州", "无锡", "常州", "南通"],
+        "浙江": ["杭州", "宁波", "温州", "金华"], "山东": ["济南", "青岛", "烟台", "潍坊"],
+        "四川": ["成都", "绵阳"], "湖北": ["武汉", "宜昌", "襄阳"],
+        "湖南": ["长沙", "湘潭", "株洲"], "河南": ["郑州", "洛阳", "开封"],
+        "福建": ["厦门", "福州", "泉州"], "安徽": ["合肥"],
+        "陕西": ["西安", "咸阳"], "辽宁": ["大连", "沈阳"],
+        "重庆": ["重庆"], "天津": ["天津"], "北京": ["北京"], "上海": ["上海"],
+        "黑龙江": ["哈尔滨"], "吉林": ["长春", "延吉"],
+        "江西": ["南昌"], "广西": ["南宁", "桂林"], "云南": ["昆明", "大理", "丽江"],
+        "贵州": ["贵阳"], "山西": ["太原"], "河北": ["石家庄", "保定", "唐山", "秦皇岛"],
+        "甘肃": ["兰州"], "新疆": ["乌鲁木齐", "石河子"], "内蒙古": ["呼和浩特", "包头"],
+        "海南": ["海口", "三亚"], "宁夏": ["银川"], "青海": ["西宁"], "西藏": ["拉萨"],
+    }
+    result = []
+    remaining = 1.0
+    level_local_pref = {
+        CollegeLevel.C9: 0.15, CollegeLevel.PROJECT_985: 0.20,
+        CollegeLevel.PROJECT_211: 0.25, CollegeLevel.DOUBLE_FIRST_CLASS: 0.30,
+        CollegeLevel.ORDINARY: 0.45,
+    }
+    local_pref = level_local_pref.get(level, 0.35)
+    local_cities = province_capitals.get(college_province, [college_city])
+    if college_city not in local_cities:
+        local_cities = [college_city] + local_cities
+    local_pct_per_city = local_pref / len(local_cities)
+    for city in local_cities[:3]:
+        pct = local_pct_per_city * (1.2 if city == college_city else 1.0)
+        count = int(total_count * pct)
+        if count > 0:
+            city_base = CITY_SALARY_BASE.get(city, base_salary)
+            salary_noise = random.uniform(0.9, 1.1)
+            result.append({
+                "city": city,
+                "province": CITY_PROVINCE_MAP.get(city, college_province),
+                "count": count,
+                "percentage": round(pct, 4),
+                "avg_salary": int(city_base * salary_noise),
+            })
+        remaining -= pct
+    level_tier1_pref = {
+        CollegeLevel.C9: 0.55, CollegeLevel.PROJECT_985: 0.45,
+        CollegeLevel.PROJECT_211: 0.35, CollegeLevel.DOUBLE_FIRST_CLASS: 0.25,
+        CollegeLevel.ORDINARY: 0.15,
+    }
+    tier1_pref = level_tier1_pref.get(level, 0.25)
+    tier1_pct_per_city = tier1_pref / len(tier1_cities)
+    for city in tier1_cities:
+        if any(r["city"] == city for r in result):
+            continue
+        if random.random() < 0.7:
+            pct = tier1_pct_per_city * random.uniform(0.6, 1.4)
+            count = int(total_count * pct)
+            if count > 0:
+                city_base = CITY_SALARY_BASE.get(city, base_salary)
+                salary_noise = random.uniform(0.9, 1.1)
+                result.append({
+                    "city": city,
+                    "province": CITY_PROVINCE_MAP.get(city, college_province),
+                    "count": count,
+                    "percentage": round(pct, 4),
+                    "avg_salary": int(city_base * salary_noise),
+                })
+                remaining -= pct
+    if remaining > 0.05:
+        other_province_cities = []
+        for prov, cities in province_capitals.items():
+            if prov != college_province:
+                other_province_cities.extend(cities)
+        random.shuffle(other_province_cities)
+        num_other = min(8, int(remaining / 0.03))
+        other_pct_per_city = remaining / max(1, num_other)
+        for city in other_province_cities[:num_other]:
+            if any(r["city"] == city for r in result):
+                continue
+            count = int(total_count * other_pct_per_city)
+            if count > 0:
+                city_base = CITY_SALARY_BASE.get(city, base_salary)
+                salary_noise = random.uniform(0.9, 1.1)
+                result.append({
+                    "city": city,
+                    "province": CITY_PROVINCE_MAP.get(city, college_province),
+                    "count": count,
+                    "percentage": round(other_pct_per_city, 4),
+                    "avg_salary": int(city_base * salary_noise),
+                })
+    total_pct = sum(r["percentage"] for r in result)
+    if total_pct > 0:
+        for r in result:
+            r["percentage"] = round(r["percentage"] / total_pct, 4)
+    result.sort(key=lambda x: -x["percentage"])
+    return result[:15]
+
+
+def generate_employment_data(
+    college_id: str,
+    college_name: str,
+    college_province: str,
+    college_city: str,
+    level: CollegeLevel,
+    college_type: CollegeType,
+    base_employment_rate: float,
+    base_average_salary: int,
+) -> "EmploymentDataDetail":
+    from .schemas import (
+        EmploymentDataDetail, EmploymentCityDistribution,
+        EmploymentIndustryDistribution, EmploymentPositionDistribution,
+        DataSource,
+    )
+    total_graduates_by_level = {
+        CollegeLevel.C9: (3500, 5500),
+        CollegeLevel.PROJECT_985: (3000, 5000),
+        CollegeLevel.PROJECT_211: (2500, 4500),
+        CollegeLevel.DOUBLE_FIRST_CLASS: (2000, 4000),
+        CollegeLevel.ORDINARY: (1500, 3500),
+    }
+    grad_range = total_graduates_by_level.get(level, (2000, 3500))
+    total_graduates = random.randint(grad_range[0], grad_range[1])
+    data_source = DataSource.OFFICIAL if random.random() < 0.6 else DataSource.THIRD_PARTY
+    industry_bias = COLLEGE_TYPE_INDUSTRY_BIAS.get(college_type, COLLEGE_TYPE_INDUSTRY_BIAS[CollegeType.COMPREHENSIVE])
+    position_bias = COLLEGE_TYPE_POSITION_BIAS.get(college_type, COLLEGE_TYPE_POSITION_BIAS[CollegeType.COMPREHENSIVE])
+    industry_dist_raw = _generate_distribution(
+        industry_bias, EMPLOYMENT_INDUSTRIES, total_graduates, base_average_salary, INDUSTRY_SALARY_FACTOR
+    )
+    position_dist_raw = _generate_distribution(
+        position_bias, EMPLOYMENT_POSITION_TYPES, total_graduates, base_average_salary, POSITION_SALARY_FACTOR
+    )
+    city_dist_raw = _generate_city_distribution(
+        college_province, college_city, level, total_graduates, base_average_salary
+    )
+    industry_distribution = [
+        EmploymentIndustryDistribution(
+            industry=d["name"],
+            count=d["count"],
+            percentage=d["percentage"],
+            avg_salary=d["avg_salary"],
+        )
+        for d in industry_dist_raw
+    ]
+    position_distribution = [
+        EmploymentPositionDistribution(
+            position_type=d["name"],
+            count=d["count"],
+            percentage=d["percentage"],
+            avg_salary=d["avg_salary"],
+        )
+        for d in position_dist_raw
+    ]
+    city_distribution = [
+        EmploymentCityDistribution(
+            city=d["city"],
+            province=d["province"],
+            count=d["count"],
+            percentage=d["percentage"],
+            avg_salary=d["avg_salary"],
+        )
+        for d in city_dist_raw
+    ]
+    note = None
+    if data_source == DataSource.THIRD_PARTY:
+        note = "数据来自第三方就业调查机构样本统计，仅供参考"
+    return EmploymentDataDetail(
+        college_id=college_id,
+        college_name=college_name,
+        year=2025,
+        total_graduates=total_graduates,
+        employment_rate=round(base_employment_rate + random.uniform(-0.02, 0.02), 4),
+        average_salary=base_average_salary,
+        data_source=data_source,
+        city_distribution=city_distribution,
+        industry_distribution=industry_distribution,
+        position_distribution=position_distribution,
+        note=note,
+    )
