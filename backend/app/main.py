@@ -9,12 +9,13 @@ from .schemas import (
     CombinationCompareRequest, CombinationCompareResult,
     SubjectRequirementRule, EmploymentDataDetail,
     MonteCarloRequest, MonteCarloResponse,
+    SimulationRequest, SimulationResult,
 )
 from .data_generator import (
     get_all_provinces, get_all_subject_combinations, get_all_cities, get_all_major_directions,
     get_all_majors, get_major_detail, compare_majors
 )
-from .algorithms import filter_and_predict, generate_volunteer_plan, batch_monte_carlo_simulation
+from .algorithms import filter_and_predict, generate_volunteer_plan, batch_monte_carlo_simulation, simulate_admission
 from .pdf_export import generate_plan_pdf
 from .database import COLLEGES
 from .subject_analysis import (
@@ -241,3 +242,15 @@ def run_monte_carlo(req: MonteCarloRequest):
         num_simulations=req.num_simulations,
         common_bins=common_bins,
     )
+
+
+@app.post("/api/simulate/admission", response_model=SimulationResult, summary="模拟平行志愿录取推演")
+def simulate_parallel_admission(req: SimulationRequest):
+    if not req.volunteers:
+        raise HTTPException(status_code=400, detail="请至少填写 1 个志愿")
+    if req.score <= 0 or req.rank <= 0:
+        raise HTTPException(status_code=400, detail="请填写有效的分数和位次")
+    if not req.province:
+        raise HTTPException(status_code=400, detail="请选择省份")
+    result = simulate_admission(COLLEGES, req)
+    return result

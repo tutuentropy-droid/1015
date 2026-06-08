@@ -5,7 +5,9 @@ import numpy as np
 from .schemas import (
     College, UserInput, CollegePrediction, VolunteerItem,
     VolunteerPlan, AdmissionData, Category, Major,
-    MonteCarloCollegeResult, MonteCarloHistogramBin
+    MonteCarloCollegeResult, MonteCarloHistogramBin,
+    SimulationStep, SimulationStepType, SimulationResult,
+    SimulationRequest, SimulationVolunteerItem
 )
 
 
@@ -452,3 +454,320 @@ def batch_monte_carlo_simulation(
     common_bins = [round(all_min + i * bin_width, 4) for i in range(num_bins + 1)]
 
     return results, common_bins
+
+
+def _get_college_threshold(college: College, province: str, reference_year: int) -> Tuple[Optional[int], Optional[int]]:
+    province_data = [d for d in college.admission_data if d.province == province and d.year == reference_year]
+    if not province_data:
+        province_data = [d for d in college.admission_data if d.year == reference_year]
+    if not province_data:
+        years = sorted(list(set(d.year for d in college.admission_data)), reverse=True)
+        if years:
+            latest = years[0]
+            province_data = [d for d in college.admission_data if d.province == province and d.year == latest]
+            if not province_data:
+                province_data = [d for d in college.admission_data if d.year == latest]
+    if not province_data:
+        return None, None
+    min_score = min(d.score for d in province_data)
+    min_rank = min(d.rank for d in province_data)
+    return min_score, min_rank
+
+
+def _get_major_threshold(college: College, major_name: str, province: str, reference_year: int) -> Tuple[Optional[int], Optional[int]]:
+    college_score, college_rank = _get_college_threshold(college, province, reference_year)
+    if college_score is None:
+        return None, None
+    import random
+    random.seed(hash(f"{college.id}_{major_name}_{province}_{reference_year}") % 10000)
+    bonus_score = random.randint(0, 15)
+    bonus_rank_ratio = random.uniform(0.85, 1.0)
+    return college_score + bonus_score, max(50, int(college_rank * bonus_rank_ratio))
+
+
+def simulate_admission(
+    colleges: List[College],
+    req: SimulationRequest,
+) -> SimulationResult:
+    steps: List[SimulationStep] = []
+    step_index = 0
+    admitted_college = None
+    admitted_major = None
+    admitted_order = None
+
+    sorted_volunteers = sorted(req.volunteers, key=lambda v: v.order)
+
+    for volunteer in sorted_volunteers:
+        college = next((c for c in colleges if c.id == volunteer.college_id), None)
+        if college is None:
+            step_index += 1
+            steps.append(SimulationStep(
+                step_index=step_index,
+                step_type=SimulationStepType.RETRIEVE,
+                volunteer_order=volunteer.order,
+                college_name=volunteer.college_name or "未知院校",
+                title=f"第 {volunteer.order} 志愿：{volunteer.college_name or '未知院校'}",
+                description="未找到该院校的录取数据，跳过该志愿",
+                is_final=False,
+            ))
+            step_index += 1
+            steps.append(SimulationStep(
+                step_index=step_index,
+                step_type=SimulationStepType.NEXT_VOLUNTEER,
+                volunteer_order=volunteer.order,
+                college_name=volunteer.college_name or "未知院校",
+                title="进入下一志愿",
+                description=f"由于院校数据缺失，进入第 {volunteer.order + 1} 志愿检索",
+                is_final=False,
+            ))
+            continue
+
+        major_name = volunteer.major_name
+        if not major_name and college.majors:
+            major_name = college.majors[0].name
+
+        step_index += 1
+        steps.append(SimulationStep(
+            step_index=step_index,
+            step_type=SimulationStepType.RETRIEVE,
+            volunteer_order=volunteer.order,
+            college_name=college.name,
+            major_name=major_name,
+            title=f"第 {volunteer.order} 志愿：{college.name}",
+            description=f"开始检索该院校，目标专业：{major_name or '未指定'}",
+            is_final=False,
+        ))
+
+        threshold_score, threshold_rank = _get_college_threshold(college, req.province, req.reference_year)
+        if threshold_score is None:
+            step_index += 1
+            steps.append(SimulationStep(
+                step_index=step_index,
+                step_type=SimulationStepType.THRESHOLD_CHECK,
+                volunteer_order=volunteer.order,
+                college_name=college.name,
+                major_name=major_name,
+                title="投档线判断",
+                description=f"未找到 {req.reference_year} 年该校在 {req.province} 的投档数据",
+                passed=False,
+                is_final=False,
+            ))
+            step_index += 1
+            steps.append(SimulationStep(
+                step_index=step_index,
+                step_type=SimulationStepType.NEXT_VOLUNTEER,
+                volunteer_order=volunteer.order,
+                college_name=college.name,
+                title="进入下一志愿",
+                description=f"投档线数据不足，进入第 {volunteer.order + 1} 志愿",
+                is_final=False,
+            ))
+            continue
+
+        score_passed = req.score >= threshold_score
+        rank_passed = req.rank <= threshold_rank
+        threshold_passed = score_passed or rank_passed
+
+        step_index += 1
+        steps.append(SimulationStep(
+            step_index=step_index,
+            step_type=SimulationStepType.THRESHOLD_CHECK,
+            volunteer_order=volunteer.order,
+            college_name=college.name,
+            major_name=major_name,
+            title="投档线判断",
+            description=(
+                f"参考年份 {req.reference_year} 年投档数据："
+                f"最低分 {threshold_score} 分，最低位次 {threshold_rank}；"
+                f"你的分数 {req.score} 分，位次 {req.rank}。"
+                f"{'分数达标' if score_passed else '分数未达'}，"
+                f"{'位次达标' if rank_passed else '位次未达'}。"
+            ),
+            user_score=req.score,
+            user_rank=req.rank,
+            threshold_score=threshold_score,
+            threshold_rank=threshold_rank,
+            passed=threshold_passed,
+            is_final=False,
+        ))
+
+        if not threshold_passed:
+            step_index += 1
+            steps.append(SimulationStep(
+                step_index=step_index,
+                step_type=SimulationStepType.NEXT_VOLUNTEER,
+                volunteer_order=volunteer.order,
+                college_name=college.name,
+                title="进入下一志愿",
+                description=(
+                    f"你的分数/位次未达到该校投档线，"
+                    f"档案不会投向该校，将检索第 {volunteer.order + 1} 志愿。"
+                    f"【平行志愿规则】：按志愿顺序依次检索，前面的志愿未达到投档线时，"
+                    f"自动检索下一个志愿，互不影响。"
+                ),
+                is_final=False,
+            ))
+            continue
+
+        major_score, major_rank = None, None
+        major_passed = True
+        if major_name:
+            major_score, major_rank = _get_major_threshold(college, major_name, req.province, req.reference_year)
+            if major_score is not None:
+                major_passed = req.score >= major_score or req.rank <= major_rank
+                step_index += 1
+                steps.append(SimulationStep(
+                    step_index=step_index,
+                    step_type=SimulationStepType.MAJOR_CHECK,
+                    volunteer_order=volunteer.order,
+                    college_name=college.name,
+                    major_name=major_name,
+                    title="专业分数线判断",
+                    description=(
+                        f"专业「{major_name}」参考分数线："
+                        f"约 {major_score} 分，对应位次约 {major_rank}；"
+                        f"你的分数 {req.score} 分，位次 {req.rank}。"
+                        f"{'专业分数线达标' if major_passed else '专业分数线未达标'}。"
+                    ),
+                    user_score=req.score,
+                    user_rank=req.rank,
+                    threshold_score=major_score,
+                    threshold_rank=major_rank,
+                    passed=major_passed,
+                    is_final=False,
+                ))
+
+        if major_passed:
+            step_index += 1
+            steps.append(SimulationStep(
+                step_index=step_index,
+                step_type=SimulationStepType.ADMITTED,
+                volunteer_order=volunteer.order,
+                college_name=college.name,
+                major_name=major_name,
+                title="🎉 录取成功",
+                description=(
+                    f"恭喜！你的档案已成功投向「{college.name}」，"
+                    f"并被「{major_name or '调剂专业'}」专业录取。"
+                    f"【平行志愿规则】：一旦被某个志愿录取，"
+                    f"后续志愿将不再检索，录取流程结束。"
+                ),
+                passed=True,
+                is_final=True,
+            ))
+            admitted_college = college.name
+            admitted_major = major_name
+            admitted_order = volunteer.order
+            break
+
+        if volunteer.accept_adjustment:
+            step_index += 1
+            steps.append(SimulationStep(
+                step_index=step_index,
+                step_type=SimulationStepType.ADJUSTMENT,
+                volunteer_order=volunteer.order,
+                college_name=college.name,
+                major_name=major_name,
+                title="服从调剂判断",
+                description=(
+                    f"专业「{major_name}」分数线未达标，但你勾选了「服从专业调剂」。"
+                    f"学校将把你调剂到该校其他未满额的专业。"
+                    f"【平行志愿规则】：服从调剂可大幅降低退档风险，"
+                    f"只要达到投档线且服从调剂，绝大多数情况下不会被退档。"
+                ),
+                passed=True,
+                is_final=False,
+            ))
+            adjusted_major = None
+            for m in college.majors:
+                if m.name != major_name:
+                    adjusted_major = m.name
+                    break
+            if not adjusted_major and college.majors:
+                adjusted_major = college.majors[0].name
+            step_index += 1
+            steps.append(SimulationStep(
+                step_index=step_index,
+                step_type=SimulationStepType.ADMITTED,
+                volunteer_order=volunteer.order,
+                college_name=college.name,
+                major_name=adjusted_major,
+                title="🎉 调剂录取成功",
+                description=(
+                    f"你的档案已投向「{college.name}」，"
+                    f"因所填专业「{major_name}」分数不足，"
+                    f"被调剂录取到「{adjusted_major or '其他专业'}」专业。"
+                    f"【提示】：如不希望被调剂到不喜欢的专业，"
+                    f"请慎重考虑是否勾选「服从调剂」，但不服从会增加退档风险。"
+                ),
+                passed=True,
+                is_final=True,
+            ))
+            admitted_college = college.name
+            admitted_major = adjusted_major
+            admitted_order = volunteer.order
+            break
+        else:
+            step_index += 1
+            steps.append(SimulationStep(
+                step_index=step_index,
+                step_type=SimulationStepType.WITHDRAW,
+                volunteer_order=volunteer.order,
+                college_name=college.name,
+                major_name=major_name,
+                title="⚠️ 退档",
+                description=(
+                    f"你的分数达到了「{college.name}」的投档线，"
+                    f"但未达到专业「{major_name}」的分数线，"
+                    f"且你未勾选「服从专业调剂」，因此被退档。"
+                    f"【平行志愿规则·重要】：一旦被退档，本批次后续所有志愿将不再检索，"
+                    f"只能参加征集志愿或下一批次录取。这也是为什么建议勾选「服从调剂」。"
+                ),
+                passed=False,
+                is_final=True,
+            ))
+            break
+
+    if admitted_college is None and not any(s.is_final for s in steps):
+        step_index += 1
+        steps.append(SimulationStep(
+            step_index=step_index,
+            step_type=SimulationStepType.WITHDRAW,
+            volunteer_order=len(sorted_volunteers),
+            college_name="所有志愿",
+            title="所有志愿均未录取",
+            description=(
+                f"你的分数/位次均未达到所填报的 {len(sorted_volunteers)} 个志愿的投档线，"
+                f"本批次未被录取。"
+                f"【建议】：请检查志愿梯度是否合理，确保包含足够的「保底」院校。"
+            ),
+            passed=False,
+            is_final=True,
+        ))
+
+    if admitted_college:
+        summary = (
+            f"推演结果：你将被第 {admitted_order} 志愿「{admitted_college}」的"
+            f"「{admitted_major or '调剂专业'}」专业录取。"
+        )
+    else:
+        final_step = next((s for s in reversed(steps) if s.is_final), None)
+        if final_step and final_step.step_type == SimulationStepType.WITHDRAW and "退档" in final_step.title:
+            summary = (
+                f"推演结果：你在第 {final_step.volunteer_order} 志愿被退档，"
+                f"本批次后续志愿不再检索。请慎重考虑「服从调剂」选项。"
+            )
+        else:
+            summary = (
+                f"推演结果：所填报的 {len(sorted_volunteers)} 个志愿均未达到投档线，"
+                f"建议调整志愿梯度，增加保底院校。"
+            )
+
+    return SimulationResult(
+        success=admitted_college is not None,
+        admitted_college=admitted_college,
+        admitted_major=admitted_major,
+        admitted_order=admitted_order,
+        steps=steps,
+        summary=summary,
+    )

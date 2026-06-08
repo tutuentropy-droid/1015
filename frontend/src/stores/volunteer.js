@@ -56,9 +56,13 @@ export const useVolunteerStore = defineStore('volunteer', {
       majors: false,
       majorCompare: false,
       monteCarlo: false,
+      simulation: false,
     },
 
     monteCarloResult: null,
+
+    simulationResult: null,
+    simulationHistory: [],
   }),
 
   getters: {
@@ -354,6 +358,41 @@ export const useVolunteerStore = defineStore('volunteer', {
 
     clearMonteCarlo() {
       this.monteCarloResult = null
+    },
+
+    async runSimulation(params) {
+      if (!params || !params.volunteers || !params.volunteers.length) {
+        throw new Error('请至少填写 1 个志愿')
+      }
+      if (!params.province || !params.score || !params.rank) {
+        throw new Error('请填写省份、分数和位次')
+      }
+      this.loading.simulation = true
+      try {
+        this.simulationResult = await predictApi.simulateAdmission(params)
+        return this.simulationResult
+      } finally {
+        this.loading.simulation = false
+      }
+    },
+
+    saveSimulationToHistory(label, volunteers) {
+      if (!this.simulationResult) return
+      this.simulationHistory.push({
+        id: Date.now(),
+        label: label || `推演方案 ${this.simulationHistory.length + 1}`,
+        result: JSON.parse(JSON.stringify(this.simulationResult)),
+        volunteers: volunteers ? JSON.parse(JSON.stringify(volunteers)) : null,
+        createdAt: new Date().toLocaleString(),
+      })
+    },
+
+    clearSimulation() {
+      this.simulationResult = null
+    },
+
+    clearSimulationHistory() {
+      this.simulationHistory = []
     },
   },
 })

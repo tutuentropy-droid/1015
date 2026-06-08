@@ -42,6 +42,7 @@ export const predictApi = {
       timeout: 30000,
     }),
   monteCarlo: (data) => api.post('/predict/monte-carlo', data),
+  simulateAdmission: (data) => api.post('/simulate/admission', data),
 }
 
 export const subjectApi = {

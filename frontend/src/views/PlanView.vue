@@ -157,6 +157,258 @@
       </div>
 
       <div class="section-card">
+        <h2 class="section-title">🎯 平行志愿录取推演</h2>
+        <el-alert type="info" :closable="false" show-icon style="margin-bottom: 16px">
+          <template #title>
+            基于去年（参考年份）分数线，按照平行志愿投档规则模拟真实录取流程。
+            你可以调整志愿顺序后重新推演，对比不同排列方式的最终录取结果差异。
+          </template>
+        </el-alert>
+
+        <div class="sim-header">
+          <div class="sim-user-info">
+            <el-tag type="primary">{{ volunteerStore.volunteerPlan.user_input.province }}</el-tag>
+            <el-tag type="success">分数 {{ volunteerStore.volunteerPlan.user_input.score }}</el-tag>
+            <el-tag type="warning">位次 {{ volunteerStore.volunteerPlan.user_input.rank }}</el-tag>
+          </div>
+          <div class="sim-header-actions">
+            <el-button @click="resetSimVolunteers">
+              <el-icon><Refresh /></el-icon>
+              <span>恢复推荐顺序</span>
+            </el-button>
+            <el-button type="primary" :loading="volunteerStore.loading.simulation" @click="runSim">
+              <el-icon><VideoPlay /></el-icon>
+              <span>开始推演</span>
+            </el-button>
+          </div>
+        </div>
+
+        <div class="sim-layout">
+          <div class="sim-left">
+            <h3 class="sim-subtitle">📝 调整志愿顺序（点击箭头上下移动）</h3>
+            <div class="sim-volunteer-list">
+              <div
+                v-for="(item, idx) in simVolunteers"
+                :key="item.order + '_' + idx"
+                class="sim-volunteer-item"
+                :class="{ active: volunteerStore.simulationResult && getActiveStepVolunteerOrder() === item.order }"
+              >
+                <div class="sim-vol-left">
+                  <div class="sim-order-badge" :class="`badge-${categoryClass(item.category)}`">
+                    {{ item.order }}
+                  </div>
+                  <div class="sim-move-btns">
+                    <el-button
+                      size="small"
+                      circle
+                      :disabled="idx === 0"
+                      @click="moveVolunteer(idx, -1)"
+                    >
+                      <el-icon><ArrowUp /></el-icon>
+                    </el-button>
+                    <el-button
+                      size="small"
+                      circle
+                      :disabled="idx === simVolunteers.length - 1"
+                      @click="moveVolunteer(idx, 1)"
+                    >
+                      <el-icon><ArrowDown /></el-icon>
+                    </el-button>
+                  </div>
+                </div>
+                <div class="sim-vol-main">
+                  <div class="sim-college-name">{{ item.college.name }}</div>
+                  <div class="sim-major-row">
+                    <el-icon><Notebook /></el-icon>
+                    <span class="sim-major-name">{{ item.recommended_major.name }}</span>
+                  </div>
+                  <div class="sim-accept-row">
+                    <el-checkbox v-model="item.accept_adjustment" size="small">
+                      服从专业调剂
+                    </el-checkbox>
+                  </div>
+                </div>
+                <div class="sim-vol-right">
+                  <div class="sim-cat-tag" :class="`tag-${categoryClass(item.category)}`">
+                    {{ item.category }}
+                  </div>
+                  <div class="sim-prob" :style="{ color: probColor(item.probability) }">
+                    {{ (item.probability * 100).toFixed(0) }}%
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sim-right">
+            <div class="sim-tabs">
+              <el-radio-group v-model="simRightTab" size="default">
+                <el-radio-button label="process">推演过程</el-radio-button>
+                <el-radio-button label="compare">结果对比</el-radio-button>
+              </el-radio-group>
+            </div>
+
+            <div v-if="simRightTab === 'process'" class="sim-process">
+              <template v-if="!volunteerStore.simulationResult">
+                <el-empty description="点击「开始推演」按钮，查看平行志愿投档录取全过程" />
+              </template>
+              <template v-else>
+                <div class="sim-result-summary" :class="volunteerStore.simulationResult.success ? 'success' : 'fail'">
+                  <div class="sim-result-icon">
+                    {{ volunteerStore.simulationResult.success ? '🎉' : '⚠️' }}
+                  </div>
+                  <div class="sim-result-text">{{ volunteerStore.simulationResult.summary }}</div>
+                  <el-button
+                    size="small"
+                    type="primary"
+                    plain
+                    @click="handleSaveHistory"
+                    style="margin-top: 8px"
+                  >
+                    保存本次结果用于对比
+                  </el-button>
+                </div>
+
+                <div class="sim-step-controls">
+                  <el-button size="small" :disabled="currentStepIndex <= 0" @click="prevStep">
+                    <el-icon><ArrowLeft /></el-icon>
+                    <span>上一步</span>
+                  </el-button>
+                  <span class="sim-step-counter">
+                    步骤 {{ currentStepIndex + 1 }} / {{ volunteerStore.simulationResult.steps.length }}
+                  </span>
+                  <el-button
+                    size="small"
+                    :disabled="currentStepIndex >= volunteerStore.simulationResult.steps.length - 1"
+                    @click="nextStep"
+                  >
+                    <span>下一步</span>
+                    <el-icon><ArrowRight /></el-icon>
+                  </el-button>
+                  <el-button size="small" @click="playAllSteps" :disabled="isPlaying">
+                    <el-icon><VideoPlay /></el-icon>
+                    <span>{{ isPlaying ? '播放中...' : '自动播放' }}</span>
+                  </el-button>
+                </div>
+
+                <div class="sim-steps">
+                  <div
+                    v-for="(step, idx) in volunteerStore.simulationResult.steps"
+                    :key="step.step_index"
+                    class="sim-step"
+                    :class="{
+                      active: idx === currentStepIndex,
+                      done: idx < currentStepIndex,
+                      final: step.is_final,
+                      [`step-${step.step_type}`]: true,
+                    }"
+                    @click="setCurrentStep(idx)"
+                  >
+                    <div class="sim-step-dot">
+                      <div class="dot-inner">
+                        <span v-if="step.step_type === 'ADMITTED'">✓</span>
+                        <span v-else-if="step.step_type === 'WITHDRAW'">✗</span>
+                        <span v-else-if="step.passed === true">✓</span>
+                        <span v-else-if="step.passed === false">✗</span>
+                        <span v-else>{{ idx + 1 }}</span>
+                      </div>
+                    </div>
+                    <div class="sim-step-content">
+                      <div class="sim-step-title">{{ step.title }}</div>
+                      <div v-if="idx <= currentStepIndex" class="sim-step-desc">
+                        {{ step.description }}
+                        <div v-if="step.threshold_score && idx <= currentStepIndex" class="sim-step-threshold">
+                          <div class="threshold-row">
+                            <span>你的分数</span>
+                            <b :class="step.user_score >= step.threshold_score ? 'pass' : 'fail'">
+                              {{ step.user_score }} 分
+                            </b>
+                            <span>→</span>
+                            <span>投档线</span>
+                            <b>{{ step.threshold_score }} 分</b>
+                          </div>
+                          <div class="threshold-row">
+                            <span>你的位次</span>
+                            <b :class="step.user_rank <= step.threshold_rank ? 'pass' : 'fail'">
+                              {{ step.user_rank }}
+                            </b>
+                            <span>→</span>
+                            <span>投档位次</span>
+                            <b>{{ step.threshold_rank }}</b>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <div v-else class="sim-compare">
+              <template v-if="volunteerStore.simulationHistory.length === 0">
+                <el-empty description="暂无历史推演结果，请先推演并保存结果" />
+              </template>
+              <template v-else>
+                <div class="sim-compare-header">
+                  <span>已保存 {{ volunteerStore.simulationHistory.length }} 个推演方案</span>
+                  <el-button size="small" type="danger" plain @click="volunteerStore.clearSimulationHistory()">
+                    清空对比
+                  </el-button>
+                </div>
+                <el-table :data="volunteerStore.simulationHistory" stripe size="small">
+                  <el-table-column label="方案" width="140">
+                    <template #default="{ row }">
+                      <el-input
+                        v-model="row.label"
+                        size="small"
+                        placeholder="方案名称"
+                      />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="录取结果">
+                    <template #default="{ row }">
+                      <el-tag :type="row.result.success ? 'success' : 'danger'" size="small">
+                        {{ row.result.success ? '录取成功' : '未录取/退档' }}
+                      </el-tag>
+                      <span v-if="row.result.success" style="margin-left: 8px; font-size: 13px">
+                        第{{ row.result.admitted_order }}志愿 · {{ row.result.admitted_college }} · {{ row.result.admitted_major }}
+                      </span>
+                      <span v-else style="margin-left: 8px; font-size: 13px; color: #64748b">
+                        {{ row.result.summary }}
+                      </span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="推演时间" width="170" prop="createdAt" />
+                  <el-table-column label="操作" width="120">
+                    <template #default="{ $index }">
+                      <el-button
+                        size="small"
+                        type="danger"
+                        link
+                        @click="removeHistory($index)"
+                      >
+                        删除
+                      </el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+
+                <div v-if="volunteerStore.simulationHistory.length >= 2" class="sim-compare-insight">
+                  <el-alert type="warning" :closable="false" show-icon>
+                    <template #title>
+                      💡 对比洞察：不同志愿顺序可能导致完全不同的录取结果。
+                      平行志愿按照「分数优先、遵循志愿、一轮投档」原则，
+                      将最想去的学校放在前面，同时确保保底院校放在最后，是最优策略。
+                    </template>
+                  </el-alert>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
         <h2 class="section-title">📋 报考建议</h2>
         <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px">
           <template #title>
@@ -188,9 +440,13 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { ref, reactive, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import {
+  Download, Refresh, VideoPlay, ArrowUp, ArrowDown,
+  ArrowLeft, ArrowRight, Notebook
+} from '@element-plus/icons-vue'
 import { useVolunteerStore } from '../stores/volunteer'
 import ScoreTrendChart from '../components/ScoreTrendChart.vue'
 import VolunteerWarning from '../components/VolunteerWarning.vue'
@@ -201,6 +457,128 @@ const volunteerStore = useVolunteerStore()
 onMounted(() => {
   volunteerStore.loadMeta()
 })
+
+const simRightTab = ref('process')
+const simVolunteers = ref([])
+const currentStepIndex = ref(0)
+const isPlaying = ref(false)
+let playTimer = null
+
+watch(
+  () => volunteerStore.volunteerPlan,
+  (plan) => {
+    if (plan) {
+      resetSimVolunteers()
+    }
+  },
+  { immediate: true }
+)
+
+onBeforeUnmount(() => {
+  if (playTimer) clearInterval(playTimer)
+})
+
+function resetSimVolunteers() {
+  if (!volunteerStore.volunteerPlan) return
+  simVolunteers.value = volunteerStore.volunteerPlan.volunteers.map((v, idx) => ({
+    ...JSON.parse(JSON.stringify(v)),
+    order: idx + 1,
+    accept_adjustment: volunteerStore.volunteerPlan.user_input.accept_adjustment,
+  }))
+  volunteerStore.clearSimulation()
+  currentStepIndex.value = 0
+}
+
+function moveVolunteer(idx, direction) {
+  const arr = simVolunteers.value
+  const targetIdx = idx + direction
+  if (targetIdx < 0 || targetIdx >= arr.length) return
+  const temp = arr[idx]
+  arr[idx] = arr[targetIdx]
+  arr[targetIdx] = temp
+  arr.forEach((item, i) => {
+    item.order = i + 1
+  })
+  simVolunteers.value = [...arr]
+}
+
+async function runSim() {
+  if (!volunteerStore.volunteerPlan) return
+  const userInput = volunteerStore.volunteerPlan.user_input
+  const volunteers = simVolunteers.value.map((v) => ({
+    order: v.order,
+    college_id: v.college.id,
+    college_name: v.college.name,
+    major_id: v.recommended_major?.id,
+    major_name: v.recommended_major?.name,
+    accept_adjustment: v.accept_adjustment,
+  }))
+  try {
+    await volunteerStore.runSimulation({
+      province: userInput.province,
+      score: userInput.score,
+      rank: userInput.rank,
+      subject_combination: userInput.subject_combination,
+      volunteers,
+      reference_year: 2025,
+    })
+    currentStepIndex.value = 0
+    simRightTab.value = 'process'
+    ElMessage.success('推演完成！')
+  } catch (e) {
+    ElMessage.error(e.message || '推演失败')
+  }
+}
+
+function getActiveStepVolunteerOrder() {
+  if (!volunteerStore.simulationResult) return -1
+  const step = volunteerStore.simulationResult.steps[currentStepIndex.value]
+  return step ? step.volunteer_order : -1
+}
+
+function setCurrentStep(idx) {
+  currentStepIndex.value = idx
+}
+
+function prevStep() {
+  if (currentStepIndex.value > 0) {
+    currentStepIndex.value--
+  }
+}
+
+function nextStep() {
+  if (volunteerStore.simulationResult &&
+      currentStepIndex.value < volunteerStore.simulationResult.steps.length - 1) {
+    currentStepIndex.value++
+  }
+}
+
+function playAllSteps() {
+  if (!volunteerStore.simulationResult) return
+  isPlaying.value = true
+  currentStepIndex.value = 0
+  if (playTimer) clearInterval(playTimer)
+  playTimer = setInterval(() => {
+    if (currentStepIndex.value >= volunteerStore.simulationResult.steps.length - 1) {
+      clearInterval(playTimer)
+      playTimer = null
+      isPlaying.value = false
+      return
+    }
+    currentStepIndex.value++
+  }, 1800)
+}
+
+function handleSaveHistory() {
+  const defaultLabel = `方案${volunteerStore.simulationHistory.length + 1}`
+  volunteerStore.saveSimulationToHistory(defaultLabel, simVolunteers.value)
+  ElMessage.success('已保存到对比列表')
+  simRightTab.value = 'compare'
+}
+
+function removeHistory(idx) {
+  volunteerStore.simulationHistory.splice(idx, 1)
+}
 
 function categoryClass(cat) {
   const map = { 冲: 'reach', 稳: 'stable', 保: 'safe' }
@@ -474,6 +852,395 @@ function handleToggleCompare(college) {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+  }
+}
+
+.sim-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.sim-user-info {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sim-header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.sim-layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+}
+
+.sim-subtitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #334155;
+  margin: 0 0 14px 0;
+}
+
+.sim-volunteer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 720px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.sim-volunteer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #cbd5e1;
+  transition: all 0.25s;
+}
+
+.sim-volunteer-item.active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  transform: translateX(3px);
+}
+
+.sim-volunteer-item.cat-reach { border-left-color: #ef4444; }
+.sim-volunteer-item.cat-stable { border-left-color: #f59e0b; }
+.sim-volunteer-item.cat-safe { border-left-color: #22c55e; }
+
+.sim-vol-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 48px;
+}
+
+.sim-order-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.sim-move-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sim-vol-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.sim-college-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sim-major-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.sim-major-name {
+  font-weight: 500;
+  color: #334155;
+}
+
+.sim-accept-row {
+  font-size: 12px;
+}
+
+.sim-vol-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 54px;
+}
+
+.sim-cat-tag {
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sim-prob {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sim-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sim-tabs {
+  margin-bottom: 16px;
+}
+
+.sim-process, .sim-compare {
+  flex: 1;
+}
+
+.sim-result-summary {
+  padding: 18px 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  border: 1px solid;
+}
+
+.sim-result-summary.success {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.sim-result-summary.fail {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.sim-result-icon {
+  font-size: 34px;
+  flex-shrink: 0;
+}
+
+.sim-result-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+  flex: 1;
+}
+
+.sim-step-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 10px;
+  background: #f8fafc;
+  border-radius: 10px;
+}
+
+.sim-step-counter {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  min-width: 90px;
+  text-align: center;
+}
+
+.sim-steps {
+  position: relative;
+  padding-left: 6px;
+  max-height: 560px;
+  overflow-y: auto;
+}
+
+.sim-step {
+  display: flex;
+  gap: 14px;
+  padding: 12px 12px 12px 0;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+  border-radius: 8px;
+}
+
+.sim-step:hover {
+  background: #f8fafc;
+}
+
+.sim-step.active {
+  background: #eff6ff;
+}
+
+.sim-step.done .sim-step-title {
+  color: #64748b;
+}
+
+.sim-step.final {
+  background: #fffbeb;
+}
+
+.sim-step-dot {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  display: flex;
+  justify-content: center;
+  z-index: 1;
+}
+
+.sim-step:not(:last-child) .sim-step-dot::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 34px;
+  bottom: -12px;
+  width: 2px;
+  background: #e2e8f0;
+  transform: translateX(-50%);
+}
+
+.sim-step.done:not(:last-child) .sim-step-dot::after {
+  background: #94a3b8;
+}
+
+.sim-step.active:not(:last-child) .sim-step-dot::after {
+  background: #2563eb;
+}
+
+.dot-inner {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.sim-step.done .dot-inner {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #475569;
+}
+
+.sim-step.active .dot-inner {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+  transform: scale(1.1);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+}
+
+.sim-step.step-ADMITTED .dot-inner,
+.sim-step.step-ADMITTED.active .dot-inner {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #fff;
+}
+
+.sim-step.step-WITHDRAW .dot-inner,
+.sim-step.step-WITHDRAW.active .dot-inner {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+}
+
+.sim-step.step-THRESHOLD_CHECK.active .dot-inner,
+.sim-step.step-MAJOR_CHECK.active .dot-inner {
+  background: #2563eb;
+}
+
+.sim-step.step-ADJUSTMENT.active .dot-inner {
+  background: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.sim-step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.sim-step-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.sim-step-desc {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.sim-step-threshold {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.threshold-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #64748b;
+  padding: 3px 0;
+}
+
+.threshold-row b {
+  font-size: 13px;
+  min-width: 70px;
+}
+
+.threshold-row b.pass {
+  color: #22c55e;
+}
+
+.threshold-row b.fail {
+  color: #ef4444;
+}
+
+.sim-compare-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 14px;
+  color: #475569;
+  font-weight: 500;
+}
+
+.sim-compare-insight {
+  margin-top: 16px;
+}
+
+@media (max-width: 1100px) {
+  .sim-layout {
+    grid-template-columns: 1fr;
   }
 }
 </style>

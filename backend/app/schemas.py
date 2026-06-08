@@ -368,3 +368,56 @@ class MonteCarloResponse(BaseModel):
     results: List[MonteCarloCollegeResult]
     num_simulations: int
     common_bins: List[float]
+
+
+class SimulationStepType(str, Enum):
+    RETRIEVE = "检索志愿"
+    THRESHOLD_CHECK = "投档线判断"
+    MAJOR_CHECK = "专业分数线判断"
+    ADJUSTMENT = "调剂判断"
+    ADMITTED = "录取成功"
+    WITHDRAW = "退档"
+    NEXT_VOLUNTEER = "进入下一志愿"
+
+
+class SimulationStep(BaseModel):
+    step_index: int
+    step_type: SimulationStepType
+    volunteer_order: int
+    college_name: str
+    major_name: Optional[str] = None
+    title: str
+    description: str
+    user_score: Optional[int] = None
+    user_rank: Optional[int] = None
+    threshold_score: Optional[int] = None
+    threshold_rank: Optional[int] = None
+    passed: Optional[bool] = None
+    is_final: bool = False
+
+
+class SimulationResult(BaseModel):
+    success: bool
+    admitted_college: Optional[str] = None
+    admitted_major: Optional[str] = None
+    admitted_order: Optional[int] = None
+    steps: List[SimulationStep]
+    summary: str
+
+
+class SimulationVolunteerItem(BaseModel):
+    order: int
+    college_id: str
+    college_name: str
+    major_id: Optional[str] = None
+    major_name: Optional[str] = None
+    accept_adjustment: bool = True
+
+
+class SimulationRequest(BaseModel):
+    province: str
+    score: int
+    rank: int
+    subject_combination: Optional[str] = None
+    volunteers: List[SimulationVolunteerItem]
+    reference_year: Optional[int] = 2025
